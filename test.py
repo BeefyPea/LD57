@@ -22,11 +22,10 @@ def load_sprite(path, width, height):
     # Load the sprite from the given path
     sprite_sheet = pygame.image.load(path).convert_alpha()
     
-    # Create a surface to hold the sprite (scale the sprite to desired size, if necessary)
-    surface = pygame.Surface((width, height), pygame.SRCALPHA, 32)
-    surface.blit(sprite_sheet, (0, 0), (0, 0, width, height))  # Crop the sprite if needed
+    # Scale the sprite to the desired width and height (32x32)
+    sprite_sheet = pygame.transform.scale(sprite_sheet, (width, height))
     
-    return surface
+    return sprite_sheet
 
 # --- Player Class ---
 class Player(pygame.sprite.Sprite):
@@ -40,6 +39,7 @@ class Player(pygame.sprite.Sprite):
         self.width = width
         self.height = height
         self.sprite = sprite  # The sprite image for the player
+        self.original_sprite = sprite  # Save the original sprite for flipping
 
     def move(self, dx, dy):
         self.rect.x += dx
@@ -61,8 +61,13 @@ class Player(pygame.sprite.Sprite):
         self.move(self.x_vel, self.y_vel)
 
     def draw(self, win):
-        # Draw the player sprite on the window
-        win.blit(self.sprite, (self.rect.x, self.rect.y))
+        # Flip the sprite when moving left, otherwise keep it the same
+        flipped_sprite = self.sprite
+        if self.x_vel < 0:  # Moving left
+            flipped_sprite = pygame.transform.flip(self.original_sprite, True, False)
+        
+        # Draw the (possibly flipped) player sprite on the window
+        win.blit(flipped_sprite, (self.rect.x, self.rect.y))
 
 # --- Game Functions ---
 def draw_window(player):
@@ -89,8 +94,8 @@ def handle_movement(player):
 def main():
     clock = pygame.time.Clock()
     
-    # Load the sprite (assuming the file is "player.png" and is 16x16 pixels)
-    sprite = load_sprite("uboot.png", 16, 16)
+    # Load the sprite (assuming the file is "uboot.png" and we upscale it to 32x32)
+    sprite = load_sprite("uboot.png", 32, 32)
     
     player = Player(100, 100, 50, 50, sprite)  # Set the player size to 50x50 for visibility
 
@@ -110,4 +115,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
