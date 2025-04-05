@@ -1,5 +1,6 @@
 import pygame
 import random
+import math
 import time
 from os import listdir
 from os.path import isfile, join
@@ -7,6 +8,9 @@ from os.path import isfile, join
 # --- Constants ---
 WIDTH, HEIGHT = 512, 512
 PLAYER_VEL = 4
+TILE_SIZE = 32
+GRID_ROWS, GRID_COLS = 8, 3  # Grid size
+WINDOW_WIDTH, WINDOW_HEIGHT = WIDTH, HEIGHT
 
 # --- Pygame Setup ---
 pygame.init()
@@ -19,15 +23,13 @@ BG = pygame.transform.scale(BG, (WIDTH, HEIGHT))
 
 # --- Helper Functions ---
 def load_sprite(path, width, height):
-    # Load the sprite from the given path
     sprite_sheet = pygame.image.load(path).convert_alpha()
-    
-    # Scale the sprite to the desired width and height (32x32)
     sprite_sheet = pygame.transform.scale(sprite_sheet, (width, height))
-    
     return sprite_sheet
 
-# --- Player Class ---
+
+
+# --- Classes ---
 class Player(pygame.sprite.Sprite):
     COLOR = (125, 125, 125)
 
@@ -44,25 +46,32 @@ class Player(pygame.sprite.Sprite):
         self.flip = 0
 
     def move(self, dx, dy):
-        self.rect.x += dx
-        self.rect.y += dy
+        if self.x_vel != 0 and self.y_vel !=0:
+            norm = math.sqrt(2)
+            self.rect.x += dx/norm
+            self.rect.y += dy/norm
+        else:
+            self.rect.x += dx
+            self.rect.y += dy
 
     def move_left(self, vel):
         self.x_vel = -vel
   
-
     def move_right(self, vel):
         self.x_vel = vel
     
-
     def move_up(self, vel):
         self.y_vel = -vel
 
     def move_down(self, vel):
         self.y_vel = vel
 
-    def update(self):
+    def update(self,window_rect):
         self.move(self.x_vel, self.y_vel)
+                # Clamp player within window bounds
+        self.rect.x = max(window_rect.left, min(self.rect.x, window_rect.right - self.width))
+        self.rect.y = max(window_rect.top, min(self.rect.y, window_rect.bottom - self.height))
+
     def draw(self, win):
         # Flip the sprite when moving left, otherwise keep it the same
         if self.x_vel < 0 and self.flip == 0:  # Moving left
@@ -141,10 +150,73 @@ class Enemy(pygame.sprite.Sprite):
                 self.sprite = fishR
             win.blit(self.sprite, (self.rect.x, self.rect.y))
 
-    
+class Window:
+    def __init__(self, x, y, width, height, player_sprite,player_hit, row, col):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.player = Player(256, 256, 50, 50, player_sprite,player_hit)
+        self.background = pygame.Surface((WIDTH, HEIGHT))
+        self.background.blit(BG, (0, 0))
+        self.row = row
+        self.col = col
+
+    def draw(self, win):
+        win.blit(self.background, (self.rect.x, self.rect.y))
+        self.player.draw(win)
+
+        # Draw outer borders (green) on the edges of the grid
+        border_thickness = 8
+        border_color = (0, 0, 0)
+        if self.row == 0:
+            pygame.draw.line(win, border_color, (0, 0), (WIDTH, 0), border_thickness)
+        if self.row == GRID_ROWS - 1:
+            pygame.draw.line(win, border_color, (0, HEIGHT - 1), (WIDTH, HEIGHT - 1), border_thickness)
+        if self.col == 0:
+            pygame.draw.line(win, border_color, (0, 0), (0, HEIGHT), border_thickness)
+        if self.col == GRID_COLS - 1:
+            pygame.draw.line(win, border_color, (WIDTH - 1, 0), (WIDTH - 1, HEIGHT), border_thickness)
+
+        # Optional: draw a thin red rectangle around each window (debug)
+        pygame.draw.rect(win, (255, 255, 255), self.rect, 2)
+
+    def update(self):
+        self.player.update(self.rect)
+
+    def check_transition(self, current_row, current_col, windows):
+        # Transition right
+        if self.player.rect.right >= self.rect.right and current_col < GRID_COLS - 1:
+            next_window = windows[current_row][current_col + 1]
+            next_window.player.rect.x = next_window.rect.left  # Align player at left of next window
+            next_window.player.rect.y = self.player.rect.y    # Keep same vertical position
+            return current_row, current_col + 1
+
+        # Transition left
+        elif self.player.rect.left <= self.rect.left and current_col > 0:
+            prev_window = windows[current_row][current_col - 1]
+            prev_window.player.rect.x = prev_window.rect.right - prev_window.player.width  # Align player at right of previous window
+            prev_window.player.rect.y = self.player.rect.y    # Keep same vertical position
+            return current_row, current_col - 1
+
+        # Transition down
+        elif self.player.rect.bottom >= self.rect.bottom and current_row < GRID_ROWS - 1:
+            next_window = windows[current_row + 1][current_col]
+            next_window.player.flip = self.player.flip
+            next_window.player.rect.y = next_window.rect.top  # Align player at top of next window
+            next_window.player.rect.x = self.player.rect.x    # Keep same horizontal position
+            return current_row + 1, current_col
+
+        # Transition up
+        elif self.player.rect.top <= self.rect.top and current_row > 0:
+            prev_window = windows[current_row - 1][current_col]
+            prev_window.player.flip = self.player.flip
+            prev_window.player.rect.y = prev_window.rect.bottom - prev_window.player.height  # Align player at bottom of previous window
+            prev_window.player.rect.x = self.player.rect.x    # Keep same horizontal position
+            return current_row - 1, current_col
+
+        return current_row, current_col
+ 
 
 # --- Game Functions ---
-def draw_window(player,proj,enemy):
+def draw_char(player,proj,enemy):
     collider = pygame.Rect(-100,-100,1,1)
     window.blit(BG, (0, 0))
 
@@ -164,10 +236,12 @@ def draw_window(player,proj,enemy):
             en.hunt(player.rect.x,player.rect.y)
             en.draw(window)
 
-    player.draw(window)
-    
+    #player.draw(window)
 
-    pygame.display.update()
+def draw_window(window_obj):
+    window.fill((0, 0, 0))
+    window_obj.draw(window)
+    #pygame.display.update()
 
 def handle_movement(player,proj):
     keys = pygame.key.get_pressed()
@@ -199,20 +273,49 @@ def main():
     sprite = load_sprite("sprites/uboot.png", 32, 32)
     hit = load_sprite("sprites/punch.png", 32,32)
     fish = load_sprite("sprites/fish.png", 32,32)
-    
-    player = Player(100, 100, 50, 50, sprite,hit)  # Set the player size to 50x50 for visibility
-    enemy.append(Enemy(300,300,20,20,fish,2))
+    light = load_sprite("sprites/kegel.png", 128,128)
+    lightR = light
+    lightL  = pygame.transform.flip(light, True, False)
+
+    # Create a 8x3 grid of windows
+    windows = [[Window(0, 0, WIDTH, HEIGHT, sprite, hit, row, col) for col in range(GRID_COLS)] for row in range(GRID_ROWS)]
+    current_row, current_col = 0, 1  # Start in the center window
+    current_window = windows[current_row][current_col]
+
+    enemy.append(Enemy(300,300,50,50,fish,2))
 
     run = True
     while run:
         clock.tick(60)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                run = False
-        handle_movement(player,proj)
+                run = False     
+
+        # Check for transitions and update the window
+        current_row, current_col = current_window.check_transition(current_row, current_col, windows)
+        current_window = windows[current_row][current_col]
+
+        # On-screen Movement
+        handle_movement(current_window.player,proj)
+        draw_char(current_window.player,proj,enemy)
+
+        draw_window(current_window)
+        current_window.update()
+
         
-        player.update()
-        draw_window(player,proj,enemy)
+        
+        #Light updating
+        filter = pygame.surface.Surface((540, 540))
+        filter.fill((115,115,115))
+        if current_window.player.flip == 0:  # Moving right
+            light = lightR
+            filter.blit(light, (current_window.player.rect.x+40,current_window.player.rect.y - 40))
+        elif current_window.player.flip == 1:  # Moving left
+            light = lightL   
+            filter.blit(light, (current_window.player.rect.x-115,current_window.player.rect.y - 40))
+        window.blit(filter, (-10, -10), special_flags=pygame.BLEND_RGBA_SUB)
+
+        pygame.display.flip()
 
     pygame.quit()
 
