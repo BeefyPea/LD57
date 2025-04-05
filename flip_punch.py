@@ -241,7 +241,7 @@ main_menu_img = pygame_menu.baseimage.BaseImage(image_path="./sprites/Main_men_b
 main_theme = Theme(background_color = main_menu_img, widget_font = main_menu_font, title_bar_style = pygame_menu.widgets.MENUBAR_STYLE_NONE)
 
 mixer.init()
-mixer.music.load('./sounds/Deepsea_beat_type1.wav')
+mixer.music.load('./sounds/main_menu_theme.wav')
 mixer.music.play(-1, 0.0)
 
 mainmenu = pygame_menu.Menu("", WIDTH, HEIGHT, theme = main_theme)
