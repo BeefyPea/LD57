@@ -3,6 +3,15 @@ import random
 import time
 from os import listdir
 from os.path import isfile, join
+import pygame_menu
+from pygame_menu import themes
+import pygame_menu.baseimage
+import pygame_menu.events
+from pygame_menu.themes import Theme
+import pygame_menu.widgets
+from pygame.locals import *
+from pygame import mixer
+from pygame_widgets.slider import Slider
 
 # --- Constants ---
 WIDTH, HEIGHT = 512, 512
@@ -12,6 +21,7 @@ PLAYER_VEL = 4
 pygame.init()
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Das Koks U-Boot")
+
 
 # Load background and scale
 BG = pygame.image.load("sprites/background_fish.png")
@@ -191,6 +201,9 @@ def handle_movement(player,proj):
 # --- Main Loop ---
 
 def main():
+    mixer.music.load("./sounds/Vibes.wav")
+    mixer.music.set_volume(50 / 100)
+    mixer.music.play(-1,0.0)
     proj = []
     enemy = []
     clock = pygame.time.Clock()
@@ -216,5 +229,23 @@ def main():
 
     pygame.quit()
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
+#     main()
+
+def start_game():
+    mixer.music.fadeout(1)
     main()
+
+main_menu_font = pygame_menu.font.FONT_8BIT
+main_menu_img = pygame_menu.baseimage.BaseImage(image_path="./sprites/Main_men_bg.png", drawing_mode=pygame_menu.baseimage.IMAGE_MODE_FILL)
+main_theme = Theme(background_color = main_menu_img, widget_font = main_menu_font, title_bar_style = pygame_menu.widgets.MENUBAR_STYLE_NONE)
+
+mixer.init()
+mixer.music.load('./sounds/Deepsea_beat_type1.wav')
+mixer.music.play(-1, 0.0)
+
+mainmenu = pygame_menu.Menu("", WIDTH, HEIGHT, theme = main_theme)
+mainmenu.add.button("Play", start_game)
+mainmenu.add.button("Exit", pygame_menu.events.EXIT)
+
+mainmenu.mainloop(window)
