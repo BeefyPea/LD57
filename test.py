@@ -1,12 +1,11 @@
 import pygame
-import random
-import time
-from os import listdir
-from os.path import isfile, join
+import math
 
 # --- Constants ---
 WIDTH, HEIGHT = 512, 512
 PLAYER_VEL = 5
+TILE_SIZE = 32
+WINDOW_WIDTH, WINDOW_HEIGHT = WIDTH, HEIGHT
 
 # --- Pygame Setup ---
 pygame.init()
@@ -19,18 +18,12 @@ BG = pygame.transform.scale(BG, (WIDTH, HEIGHT))
 
 # --- Helper Functions ---
 def load_sprite(path, width, height):
-    # Load the sprite from the given path
     sprite_sheet = pygame.image.load(path).convert_alpha()
-    
-    # Scale the sprite to the desired width and height (32x32)
     sprite_sheet = pygame.transform.scale(sprite_sheet, (width, height))
-    
     return sprite_sheet
 
 # --- Player Class ---
 class Player(pygame.sprite.Sprite):
-    COLOR = (125, 125, 125)
-
     def __init__(self, x, y, width, height, sprite):
         super().__init__()
         self.rect = pygame.Rect(x, y, width, height)
@@ -38,8 +31,8 @@ class Player(pygame.sprite.Sprite):
         self.y_vel = 0
         self.width = width
         self.height = height
-        self.sprite = sprite  # The sprite image for the player
-        self.original_sprite = sprite  # Save the original sprite for flipping
+        self.sprite = sprite
+        self.original_sprite = sprite
 
     def move(self, dx, dy):
         self.rect.x += dx
@@ -57,27 +50,64 @@ class Player(pygame.sprite.Sprite):
     def move_down(self, vel):
         self.y_vel = vel
 
-    def update(self):
+    def update(self, window_rect):
+        # Normalize diagonal movement
+        if self.x_vel != 0 and self.y_vel != 0:
+            norm = math.sqrt(2)
+            self.x_vel /= norm
+            self.y_vel /= norm
+
         self.move(self.x_vel, self.y_vel)
 
+        # Clamp position inside window bounds
+        self.rect.x = max(window_rect.left, min(self.rect.x, window_rect.right - self.width))
+        self.rect.y = max(145, min(self.rect.y, window_rect.bottom - self.height))  # Enforce y >= 305
+
     def draw(self, win):
-        # Flip the sprite when moving left, otherwise keep it the same
         flipped_sprite = self.sprite
-        if self.x_vel < 0:  # Moving left
+        if self.x_vel < 0:
             flipped_sprite = pygame.transform.flip(self.original_sprite, True, False)
-        
-        # Draw the (possibly flipped) player sprite on the window
         win.blit(flipped_sprite, (self.rect.x, self.rect.y))
 
+# --- Window Class ---
+class Window:
+    def __init__(self, x, y, width, height, player_sprite):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.player = Player(200, 150, 50, 50, player_sprite)  # Start position (200, 300)
+        self.background = pygame.Surface((WIDTH, HEIGHT))
+        self.background.blit(BG, (0, 0))
+
+    def draw(self, win):
+        win.blit(self.background, (self.rect.x, self.rect.y))
+        self.player.draw(win)
+        pygame.draw.rect(win, (255, 0, 0), self.rect, 2)  # Debug border
+
+    def update(self):
+        self.player.update(self.rect)
+
+    def check_transition(self, current_index, windows):
+        if self.player.rect.right >= self.rect.right and current_index < len(windows) - 1:
+            next_window = windows[current_index + 1]
+            next_window.player.rect.x = next_window.rect.left + 50
+            next_window.player.rect.y = self.player.rect.y
+            return current_index + 1
+
+        elif self.player.rect.left <= self.rect.left and current_index > 0:
+            prev_window = windows[current_index - 1]
+            prev_window.player.rect.x = prev_window.rect.right - 50 - self.player.width
+            prev_window.player.rect.y = self.player.rect.y
+            return current_index - 1
+
+        return current_index
+
 # --- Game Functions ---
-def draw_window(player):
-    window.blit(BG, (0, 0))
-    player.draw(window)
+def draw_window(window_obj):
+    window.fill((0, 0, 0))
+    window_obj.draw(window)
     pygame.display.update()
 
 def handle_movement(player):
     keys = pygame.key.get_pressed()
-
     player.x_vel = 0
     player.y_vel = 0
 
@@ -93,11 +123,12 @@ def handle_movement(player):
 # --- Main Loop ---
 def main():
     clock = pygame.time.Clock()
-    
-    # Load the sprite (assuming the file is "uboot.png" and we upscale it to 32x32)
     sprite = load_sprite("uboot.png", 32, 32)
-    
-    player = Player(100, 100, 50, 50, sprite)  # Set the player size to 50x50 for visibility
+
+    # Create multiple windows
+    windows = [Window(0, 0, WIDTH, HEIGHT, sprite) for _ in range(5)]
+    current_index = 2
+    current_window = windows[current_index]
 
     run = True
     while run:
@@ -107,9 +138,16 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
 
-        handle_movement(player)
-        player.update()
-        draw_window(player)
+        handle_movement(current_window.player)
+        current_window.update()
+
+        # Handle window transition
+        new_index = current_window.check_transition(current_index, windows)
+        if new_index != current_index:
+            current_index = new_index
+            current_window = windows[current_index]
+
+        draw_window(current_window)
 
     pygame.quit()
 
