@@ -228,15 +228,13 @@ def draw_char(player,proj,enemy):
             punch.fly()
             punch.draw(window)
 
-    for ind,en in enumerate(enemy):
+    for ind,en in enumerate(enemy): #check for enemies, delete if collided
         if en.collide(collider) == True:
                 enemy.pop(ind)
                 proj.pop()
         else: 
             en.hunt(player.rect.x,player.rect.y)
             en.draw(window)
-
-    #player.draw(window)
 
 def draw_window(window_obj):
     window.fill((0, 0, 0))
@@ -259,7 +257,7 @@ def handle_movement(player,proj):
         player.move_down(PLAYER_VEL)
     if keys[pygame.K_SPACE]:
         if len(proj) < 1:
-            proj.append(projectile(player.rect.x + (-1)**player.flip*24,player.rect.y,16,16,player.hit,player.flip,1))
+            proj.append(projectile(player.rect.x + (-1)**player.flip*24,player.rect.y,16,16,player.hit,player.flip,0.5))
 
 
 # --- Main Loop ---
@@ -296,14 +294,14 @@ def main():
         current_window = windows[current_row][current_col]
 
         # On-screen Movement
-        handle_movement(current_window.player,proj)
-        draw_char(current_window.player,proj,enemy)
-
         draw_window(current_window)
-        current_window.update()
+        draw_char(current_window.player,proj,enemy) 
+        
+        handle_movement(current_window.player,proj)
+        current_window.player.draw(window)
+        current_window.update() 
 
-        
-        
+
         #Light updating
         filter = pygame.surface.Surface((540, 540))
         filter.fill((115,115,115))
