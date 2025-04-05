@@ -123,17 +123,22 @@ class Enemy(pygame.sprite.Sprite):
             else:
                 y = -1
 
+            self.flip = x
+
             if (distx**2 + disty**2)**0.5 < 250:
                 self.rect.x -= x * self.speed
                 self.rect.y -= y * self.speed
-            else:
-                self.rect.x += random.randint(-5,5)
-                self.rect.y += random.randint(-5,5)
 
         def collide(self,proj):
             return pygame.Rect.colliderect(self.rect,proj)
 
         def draw(self,win):
+            fishL = pygame.transform.flip(self.original_sprite, True, False)
+            fishR = self.original_sprite
+            if self.flip <= 0:  # Moving left
+                self.sprite = fishL
+            else:               # Moving left
+                self.sprite = fishR
             win.blit(self.sprite, (self.rect.x, self.rect.y))
 
     
@@ -158,7 +163,7 @@ def draw_window(player,proj,enemy):
         else: 
             en.hunt(player.rect.x,player.rect.y)
             en.draw(window)
-            
+
     player.draw(window)
     
 
@@ -205,6 +210,7 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
         handle_movement(player,proj)
+        
         player.update()
         draw_window(player,proj,enemy)
 
