@@ -9,7 +9,7 @@ from os.path import isfile, join
 WIDTH, HEIGHT = 512, 512
 PLAYER_VEL = 4
 TILE_SIZE = 32
-GRID_ROWS, GRID_COLS = 8, 3  # Grid size
+GRID_ROWS, GRID_COLS = 5, 5  # Grid size
 WINDOW_WIDTH, WINDOW_HEIGHT = WIDTH, HEIGHT
 
 # --- Pygame Setup ---
@@ -242,7 +242,7 @@ class Collider(pygame.sprite.Sprite):
             entity.rect.x += -1*entity.x_vel*1
             entity.rect.y += -1*entity.y_vel*1
             entity.x_vel = entity.y_vel = 0
-    
+
     def draw(self,win):
         win.blit(self.sprite, (self.rect.x, self.rect.y))
         
@@ -279,7 +279,6 @@ def draw_char(player,proj,enemy,walls):
             if collider.collision_bool(punch) == True:
                 proj.pop(ind)
    
-
 def draw_window(window_obj):
     window.fill((0, 0, 0))
     window_obj.draw(window)
@@ -310,58 +309,88 @@ def main():
     proj = []
     enemy = []
     coll = []
-    clock = pygame.time.Clock()
+
+    y_walls = [[0,0,0,0],
+               [0,1,0,1],
+               [0,1,1,1],
+               [0,1,0,1],
+               [0,0,0,0]]
     
-    # Load the sprite (assuming the file is "uboot.png" and we upscale it to 32x32)
+    x_walls = [[0,0,0,0,0], #0
+               [1,1,0,0,0], #1
+               [1,0,1,0,0],
+               [0,1,0,0,0],
+               [0,0,0,0,0],]
+
+    clock = pygame.time.Clock()
+
+    # --- DEPTH METER FONT ---
+    font = pygame.font.SysFont("Arial", 20)
+
+    # Load sprites
     sprite = load_sprite("sprites/uboot.png", 32, 32)
-    hit = load_sprite("sprites/punch.png", 32,32)
-    fish = load_sprite("sprites/fish.png", 32,32)
-    coll_x = load_sprite("sprites/coll_x.png", 512,40)
-    coll_y = load_sprite("sprites/coll_y.png", 40,512)
-    light = load_sprite("sprites/kegel.png", 128,128)
+    hit = load_sprite("sprites/punch.png", 32, 32)
+    fish = load_sprite("sprites/fish.png", 32, 32)
+    coll_x = load_sprite("sprites/coll_x.png", 512, 40)
+    coll_y = load_sprite("sprites/coll_y.png", 40, 512)
+    light = load_sprite("sprites/kegel.png", 128, 128)
     lightR = light
     lightL = pygame.transform.flip(light, True, False)
 
-
-
-    # Create a 8x3 grid of windows
+    # Create a grid of windows
     windows = [[Window(0, 0, WIDTH, HEIGHT, sprite, hit, row, col) for col in range(GRID_COLS)] for row in range(GRID_ROWS)]
-    current_row, current_col = 0, 1  # Start in the center window
+    current_row, current_col = 0, 2  # Start in center window
     current_window = windows[current_row][current_col]
 
-    enemy.append(Enemy(300,300,50,50,fish,3))
-    coll.append(Collider(502,0,50,512,coll_y))
-    
+    enemy.append(Enemy(300, 300, 50, 50, fish, 3))
 
     run = True
     while run:
         clock.tick(60)
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False     
 
-        # Check for transitions and update the window
         current_row, current_col = current_window.check_transition(current_row, current_col, windows)
         current_window = windows[current_row][current_col]
+        coll = []
 
-        # On-screen Movement
+        if x_walls[current_row][current_col] == 1:
+            coll.append(Collider(0, 500, 512, 40, coll_x))
+        if x_walls[current_row - 1][current_col] == 1:
+            coll.append(Collider(0, -15, 512, 40, coll_x))
+        if y_walls[current_row][current_col - 1] == 1:
+            coll.append(Collider(-15, 0, 40, 512, coll_y))
+        if current_col < 2:
+            if y_walls[current_row][current_col] == 1:
+                coll.append(Collider(497, 0, 40, 512, coll_y))
+
         draw_window(current_window)
-        draw_char(current_window.player,proj,enemy,coll) 
+        draw_char(current_window.player, proj, enemy, coll) 
         
-        handle_movement(current_window.player,proj)
+        handle_movement(current_window.player, proj)
         current_window.player.draw(window)
         current_window.update() 
 
-        #Light updating
+        # Light rendering
         filter = pygame.surface.Surface((540, 540))
-        filter.fill((115,115,115))
-        if current_window.player.flip == 0:  # Moving right
+        filter.fill((115, 115, 115))
+        if current_window.player.flip == 0:
             light = lightR
-            filter.blit(light, (current_window.player.rect.x+40,current_window.player.rect.y - 40))
-        elif current_window.player.flip == 1:  # Moving left
-            light = lightL   
-            filter.blit(light, (current_window.player.rect.x-115,current_window.player.rect.y - 40))
+            filter.blit(light, (current_window.player.rect.x + 40, current_window.player.rect.y - 40))
+        elif current_window.player.flip == 1:
+            light = lightL
+            filter.blit(light, (current_window.player.rect.x - 115, current_window.player.rect.y - 40))
         window.blit(filter, (-10, -10), special_flags=pygame.BLEND_RGBA_SUB)
+
+        # --- DEPTH METER ---
+        player_y = current_window.player.rect.y
+        depth = current_row * 100 + int((player_y / HEIGHT) * 100)
+        shadow_text = font.render(f"Depth: {depth} m", True, (0, 0, 0))
+        depth_text = font.render(f"Depth: {depth} m", True, (255, 255, 255))
+        window.blit(shadow_text, (11, 11))  # Shadow for contrast
+        window.blit(depth_text, (10, 10))   # Actual text
 
         pygame.display.flip()
 
