@@ -319,7 +319,7 @@ def main():
     proj = []
     enemy = []
     coll = []
-    mixer.music.load("./sounds/level2.wav")
+    mixer.music.load("./sounds/Vibe.wav")
     mixer.music.play(-1, 0.0)
 
     y_walls = [[0,0], #0
@@ -350,6 +350,10 @@ def main():
     shark = load_sprite("sprites/shark.png", 64, 32)
     jellyfish1 = load_sprite("sprites/jellyfish1.png", 32, 32)
     jellyfish2 = load_sprite("sprites/jellyfish2.png", 32, 32)
+    anglerfish = load_sprite("sprites/anglerfish.png", 32, 32)
+    aal = load_sprite("sprites/aal.png", 128, 32)
+    big_jelly = load_sprite("sprites/big_jelly.png", 32, 64)
+    squid = load_sprite("sprites/squid.png", 32, 32)
     coll_x = load_sprite("sprites/coll_x.png", 512,40)
     coll_y = load_sprite("sprites/coll_y.png", 40,512)
     light = load_sprite("sprites/kegel.png", 128,128)
@@ -363,10 +367,11 @@ def main():
     current_row, current_col = 0, 1  # Start in the center window
     current_window = windows[current_row][current_col]
 
-    enemy.append(Enemy(300,300,50,50,fish,3))
-    enemy.append(Enemy(400,400,50,50,shark,1))
-    enemy.append(Enemy(300,200,50,50,jellyfish1,2))
-    enemy.append(Enemy(300,400,50,50,jellyfish2,2))
+    # enemy.append(Enemy(300,300,50,50,fish,3))
+    # enemy.append(Enemy(400,400,50,50,squid,1))#
+    # enemy.append(Enemy(300,200,50,50,big_jelly,2))
+    # enemy.append(Enemy(300,400,50,50,anglerfish,2))
+
 
     run = True
     while run:
@@ -402,7 +407,7 @@ def main():
 
         #Light updating
         filter = pygame.surface.Surface((540, 540))
-        filter.fill((60,60,60))
+        filter.fill((90,90,90))
         if current_window.player.flip == 0:  # Moving right
             light = lightR
             filter.blit(light, (current_window.player.rect.x+40,current_window.player.rect.y - 40))
@@ -428,7 +433,7 @@ def main_men():
     main_theme = Theme(background_color = main_menu_img, widget_font = main_menu_font, title_bar_style = pygame_menu.widgets.MENUBAR_STYLE_NONE)
 
     mixer.init()
-    mixer.music.load('./sounds/main_menu_theme.wav')
+    mixer.music.load('./sounds/new_intro.wav')
     mixer.music.play(-1, 0.0)
 
     mainmenu = pygame_menu.Menu("", WIDTH, HEIGHT, theme = main_theme)
