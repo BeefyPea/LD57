@@ -303,6 +303,25 @@ def handle_movement(player,proj):
             proj.append(projectile(player.rect.x + (-1)**player.flip*24,player.rect.y,16,16,player.hit,player.flip,0.5))
 
 
+def draw_dialogue_box(win, text):
+    """Draws a simple dialogue box with text on the screen."""
+    font = pygame.font.SysFont("Arial", 20)
+    
+    # Dialogue box background (semi-transparent)
+    box_width = 400
+    box_height = 60
+    box_x = (WIDTH - box_width) // 2
+    box_y =  30
+    pygame.draw.rect(win, (0, 0, 0), (box_x, box_y, box_width, box_height), 0)  # Box background
+    pygame.draw.rect(win, (255, 255, 255), (box_x, box_y, box_width, box_height), 3)  # Box border
+
+    # Text (centered in the box)
+    text_surface = font.render(text, True, (255, 255, 255))
+    text_rect = text_surface.get_rect(center=(WIDTH // 2, 30+ box_height//2))
+    win.blit(text_surface, text_rect)
+
+
+
 # --- Main Loop ---
 
 def main():
@@ -343,6 +362,11 @@ def main():
     current_window = windows[current_row][current_col]
 
     enemy.append(Enemy(300, 300, 50, 50, fish, 3))
+
+    #dialogue shit
+    BossTime = None
+    SpwanTime = None
+    dialogue_duration = 3500  # 6 seconds in milliseconds
 
     run = True
     while run:
@@ -391,6 +415,23 @@ def main():
         depth_text = font.render(f"Depth: {depth} m", True, (255, 255, 255))
         window.blit(shadow_text, (11, 11))  # Shadow for contrast
         window.blit(depth_text, (10, 10))   # Actual text
+
+        # --- Dialogue Box ---
+        if current_row == 2 and current_col == 0:
+            if BossTime is None:
+                BossTime = pygame.time.get_ticks()  # Record the start time when entering the room
+            elapsed_time = pygame.time.get_ticks() - BossTime
+
+            if elapsed_time < dialogue_duration:
+                draw_dialogue_box(window, "Jessika wir müssen kochen!")
+        if current_row == 0 and current_col == 2:
+            if SpwanTime is None:
+                SpwanTime = pygame.time.get_ticks()  # Record the start time when entering the room
+            elapsed_time = pygame.time.get_ticks() - SpwanTime
+
+            if elapsed_time < dialogue_duration:
+                draw_dialogue_box(window, "Grrr Briefbombe ans Finanzamt")
+
 
         pygame.display.flip()
 
