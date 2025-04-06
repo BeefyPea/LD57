@@ -17,7 +17,7 @@ pygame.init()
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Das Koks U-Boot")
 
-# Load background and scale
+# Load background and scale          
 BG = pygame.image.load("sprites/background_fish.png")
 BG = pygame.transform.scale(BG, (WIDTH, HEIGHT))
 
@@ -329,17 +329,17 @@ def main():
     enemy = []
     coll = []
 
-    y_walls = [[0,0,0,0],
-               [0,1,0,1],
-               [0,1,1,1],
-               [0,1,0,1],
-               [0,0,0,0]]
+    y_walls = [[0, 0, 0, 0],
+               [0, 1, 0, 1],
+               [0, 1, 1, 1],
+               [0, 1, 0, 1],
+               [0, 0, 0, 0]]
     
-    x_walls = [[0,0,0,0,0], #0
-               [1,1,0,0,0], #1
-               [1,0,1,0,0],
-               [0,1,0,0,0],
-               [0,0,0,0,0],]
+    x_walls = [[0, 0, 0, 0, 0], #0
+               [1, 1, 0, 0, 0], #1
+               [1, 0, 1, 0, 0],
+               [0, 1, 0, 0, 0],
+               [0, 0, 0, 0, 0],]
 
     clock = pygame.time.Clock()
 
@@ -349,7 +349,9 @@ def main():
     # Load sprites
     sprite = load_sprite("sprites/uboot.png", 32, 32)
     hit = load_sprite("sprites/punch.png", 32, 32)
-    fish = load_sprite("sprites/fish.png", 32, 32)
+    fish1 = load_sprite("sprites/fish.png", 32, 32)
+    fish2 = load_sprite("sprites/fish.png", 50, 50)   
+    fish3 = load_sprite("sprites/fish.png", 25, 25)
     coll_x = load_sprite("sprites/coll_x.png", 512, 40)
     coll_y = load_sprite("sprites/coll_y.png", 40, 512)
     light = load_sprite("sprites/kegel.png", 128, 128)
@@ -361,24 +363,32 @@ def main():
     current_row, current_col = 0, 2  # Start in center window
     current_window = windows[current_row][current_col]
 
-    enemy.append(Enemy(300, 300, 50, 50, fish, 3))
 
-    #dialogue shit
+
+    # Dialogue and spawn timers
     BossTime = None
     SpwanTime = None
     dialogue_duration = 3500  # 6 seconds in milliseconds
+    enemyT1 = None
+    enemyT2 = None
+    enemyT3 = None
+    enemy_spawn_duration = 10  # 10 milliseconds
+
 
     run = True
     while run:
         clock.tick(60)
-        
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                run = False     
+                run = False
 
         current_row, current_col = current_window.check_transition(current_row, current_col, windows)
         current_window = windows[current_row][current_col]
         coll = []
+
+        
+
 
         if x_walls[current_row][current_col] == 1:
             coll.append(Collider(0, 500, 512, 40, coll_x))
@@ -391,13 +401,35 @@ def main():
                 coll.append(Collider(497, 0, 40, 512, coll_y))
 
         draw_window(current_window)
-        draw_char(current_window.player, proj, enemy, coll) 
+        draw_char(current_window.player, proj, enemy, coll)
+
         
+        # ----------spawn enemys --------
+        if current_row == 1 and current_col == 2:  
+            if enemyT1 is None:
+                enemyT1 = pygame.time.get_ticks()  # Record the start time when entering the room
+            elapsed_time = pygame.time.get_ticks() - enemyT1
+            if elapsed_time < enemy_spawn_duration:
+                enemy.append(Enemy(300, 300, 50, 50, fish1, 3))
+        if current_row == 0 and current_col == 0:  
+            if enemyT2 is None:
+                enemyT2 = pygame.time.get_ticks()  # Record the start time when entering the room
+            elapsed_time = pygame.time.get_ticks() - enemyT2
+            if elapsed_time < enemy_spawn_duration:
+                enemy.append(Enemy(300, 300, 70, 70, fish2, 4))
+        if current_row == 0 and current_col == 4:  
+            if enemyT3 is None:
+                enemyT3 = pygame.time.get_ticks()  # Record the start time when entering the room
+            elapsed_time = pygame.time.get_ticks() - enemyT3
+            if elapsed_time < enemy_spawn_duration:
+                enemy.append(Enemy(300, 300, 30, 30, fish3, 2))
+
+        # ---------Handle movement, collisions, and drawing----------
         handle_movement(current_window.player, proj)
         current_window.player.draw(window)
-        current_window.update() 
+        current_window.update()
 
-        # Light rendering
+        # Light rendering (same as before)
         filter = pygame.surface.Surface((540, 540))
         filter.fill((115, 115, 115))
         if current_window.player.flip == 0:
@@ -423,14 +455,14 @@ def main():
             elapsed_time = pygame.time.get_ticks() - BossTime
 
             if elapsed_time < dialogue_duration:
-                draw_dialogue_box(window, "Jessika wir müssen kochen!")
+                draw_dialogue_box(window, "Lets throw hands fucker")
         if current_row == 0 and current_col == 2:
             if SpwanTime is None:
                 SpwanTime = pygame.time.get_ticks()  # Record the start time when entering the room
             elapsed_time = pygame.time.get_ticks() - SpwanTime
 
             if elapsed_time < dialogue_duration:
-                draw_dialogue_box(window, "Grrr Briefbombe ans Finanzamt")
+                draw_dialogue_box(window, "Damn this octopus got my Fent")
 
 
         pygame.display.flip()
@@ -439,3 +471,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
