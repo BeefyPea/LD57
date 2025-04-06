@@ -2,6 +2,7 @@ import pygame
 import random
 import time
 import math
+import numpy as np
 from os import listdir
 from os.path import isfile, join
 import pygame_menu
@@ -29,14 +30,44 @@ pygame.display.set_caption("Das Koks U-Boot")
 BG = pygame.image.load("sprites/background_fish.png")
 BG = pygame.transform.scale(BG, (WIDTH, HEIGHT))
 
+boss_beaten = False
+
 # --- Helper Functions ---
 def load_sprite(path, width, height):
     sprite_sheet = pygame.image.load(path).convert_alpha()
     sprite_sheet = pygame.transform.scale(sprite_sheet, (width, height))
     return sprite_sheet
-       
 
 # --- Classes ---
+class healthbar():
+    def __init__(self, x, y, w, h, max_hp, parent):
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
+        self.hp = max_hp
+        self.max_hp = max_hp
+        self.parent = parent
+
+    def draw(self, surface):
+        global boss_beaten
+        #calculate health ratio
+        ratio = self.hp / self.max_hp
+
+        if self.parent == "player":
+            pygame.draw.rect(surface, "darkred", (self.x, self.y, self.w, self.h))
+            pygame.draw.rect(surface, "green", (self.x, self.y, self.w * ratio, self.h))
+            if self.w * self.hp / self.max_hp == 0:
+                game_over()
+        if self.parent == "boss":
+            if self.w * self.hp / self.max_hp != 0:
+                pygame.draw.rect(surface, "darkred", (self.x, self.y, self.w, self.h))
+                pygame.draw.rect(surface, "purple", (self.x, self.y, self.w * ratio, self.h))
+            if self.w * self.hp / self.max_hp == 0:
+                main_men()
+            
+
+
 class Player(pygame.sprite.Sprite):
     COLOR = (125, 125, 125)
 
@@ -91,7 +122,7 @@ class Player(pygame.sprite.Sprite):
         win.blit(self.sprite, (self.rect.x, self.rect.y))
 
 class projectile(pygame.sprite.Sprite):
-    def __init__(self, x, y, width, height, sprite,flip,lifespan):
+    def __init__(self, x, y, width, height, sprite, flip, lifespan):
         super().__init__()
         self.rect = pygame.Rect(x, y, width, height)
         self.x_vel = 0
@@ -113,7 +144,7 @@ class projectile(pygame.sprite.Sprite):
         self.rect.x += PLAYER_VEL*2 * (-1)**self.flip
 
 class Enemy(pygame.sprite.Sprite):
-        def __init__(self, x, y, width, height, sprite,speed):
+        def __init__(self, x, y, width, height, sprite, speed ,ad):
             super().__init__()
             self.rect = pygame.Rect(x, y, width, height)
             self.x_vel = 0
@@ -124,6 +155,7 @@ class Enemy(pygame.sprite.Sprite):
             self.original_sprite = sprite  # Save the original sprite for flipping
             self.speed = speed
             self.flip = 0
+            self.dmg = ad
 
         def move(self, dx, dy):
             if self.x_vel != 0 and self.y_vel !=0:
@@ -151,6 +183,9 @@ class Enemy(pygame.sprite.Sprite):
 
             self.flip = x
 
+            if np.abs(distx) <= 3 and np.abs(disty) <= 3:
+                health_bar_player.hp -= self.dmg
+
             if (distx**2 + disty**2)**0.5 < 250:
                 self.x_vel -= x * self.speed
                 self.y_vel -= y * self.speed
@@ -169,6 +204,89 @@ class Enemy(pygame.sprite.Sprite):
             else:               # Moving left
                 self.sprite = fishR
             win.blit(self.sprite, (self.rect.x, self.rect.y))
+
+class Boss(pygame.sprite.Sprite):
+    def __init__(self, x, y, width, height, sprite, ad):
+        super().__init__()
+        self.rect = pygame.Rect(x, y, width, height)
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.sprite = sprite
+        self.dmg = ad
+        self.last_attack_time = time.time()
+
+        self.attacks = []  # Liste mit Angriffen
+        self.rage = False
+
+    def attack(self, player_pos):
+        self.attack_cooldown = 2  # Sek. bis zur nächsten Warnung
+        self.warning_duration = 1  # Sek. Warnung
+        self.attack_duration = 2     # Sek. aktiver Angriff
+        
+        if health_bar_boss.hp >= health_bar_boss.max_hp * 0.7:
+            self.rage = False
+        if health_bar_boss.hp < health_bar_boss.max_hp * 0.5:
+            self.rage = True
+
+
+        current_time = time.time()
+        if current_time - self.last_attack_time >= self.attack_cooldown:
+            self.last_attack_time = current_time
+
+            if self.rage == False:
+                x = player_pos[0] - 32
+                y = 50
+                attack_rect = pygame.Rect(x, y, 64, 412)
+
+            if self.rage == True:
+                x = [0,100]
+                x = random.choice(x)
+                y = player_pos[1]- 32
+                attack_rect = pygame.Rect(x, y, 412, 64)
+
+            self.attacks.append({
+                'rect': attack_rect,
+                'warning_start': current_time,
+                'attack_start': None,
+                'state': 'warning',
+            })
+
+
+    def update_attacks(self, window, player, proj):
+        current_time = time.time()
+        updated_attacks = []
+
+        for atk in self.attacks:
+            current_time = time.time()
+
+            if atk['state'] == 'warning':
+                if current_time - atk['warning_start'] < self.warning_duration:
+                    pygame.draw.rect(window, (255, 0, 0), atk['rect'], 2)
+                else:
+                    atk['state'] = 'active'
+                    atk['attack_start'] = current_time  # Neu für Angriff
+                    updated_attacks.append(atk)
+
+            elif atk['state'] == 'active':
+                if current_time - atk['attack_start'] < self.attack_duration:
+                    sprite = self.sprite
+                    if self.rage == True:
+                        sprite = pygame.transform.rotate(self.sprite, 90)
+                    window.blit(sprite, (atk['rect'].x, atk['rect'].y))
+                    if atk['rect'].colliderect(player.rect):
+                        health_bar_player.hp -= self.dmg
+                    updated_attacks.append(atk)
+
+                    # Kollision mit Projektilen prüfen
+                    for proj_obj in proj:
+                        if atk['rect'].colliderect(proj_obj.rect):
+                            proj.remove(proj_obj)  # Projektil löschen
+                            updated_attacks.append(atk)  # Tentakelangriff beibehalten
+                            health_bar_boss.hp -= dmg_player
+
+
 
 class Window:
     def __init__(self, x, y, width, height, player_sprite,player_hit, row, col):
@@ -257,7 +375,8 @@ class Collider(pygame.sprite.Sprite):
 
 
 # --- Game Functions ---
-def draw_char(player,proj,enemy,walls):
+def draw_char(player,proj,enemy,walls, boss):
+    global start_time, time_since_pop, boss_beaten
     coll = []
     window.blit(BG, (0, 0))   
 
@@ -286,11 +405,15 @@ def draw_char(player,proj,enemy,walls):
         for ind,punch in enumerate(proj):
             if collider.collision_bool(punch) == True:
                 proj.pop(ind)
-   
+
+    for boss_obj in boss:
+        boss_obj.attack(player.rect.center)
+        boss_obj.update_attacks(window, player, proj)
+       
+
 def draw_window(window_obj):
     window.fill((0, 0, 0))
     window_obj.draw(window)
-    #pygame.display.update()
 
 def handle_movement(player,proj):
     keys = pygame.key.get_pressed()
@@ -312,6 +435,9 @@ def handle_movement(player,proj):
     if keys[pygame.K_ESCAPE]:
         main_men()
 
+# --- define healthbars ---
+health_bar_player = healthbar(25,25,100,10,100,"player")
+health_bar_boss = healthbar(50, 462, 400, 25, 400, "boss")
 
 # --- Main Loop ---
 
@@ -319,7 +445,8 @@ def main():
     proj = []
     enemy = []
     coll = []
-    mixer.music.load("./sounds/Vibe.wav")
+    boss = []
+    mixer.music.load("./sounds/Vibes.wav")
     mixer.music.play(-1, 0.0)
 
     y_walls = [[0,0], #0
@@ -354,6 +481,7 @@ def main():
     aal = load_sprite("sprites/aal.png", 128, 32)
     big_jelly = load_sprite("sprites/big_jelly.png", 32, 64)
     squid = load_sprite("sprites/squid.png", 32, 32)
+    tentacle = load_sprite("sprites/tentacle.png", 64, 412)
     coll_x = load_sprite("sprites/coll_x.png", 512,40)
     coll_y = load_sprite("sprites/coll_y.png", 40,512)
     light = load_sprite("sprites/kegel.png", 128,128)
@@ -361,17 +489,17 @@ def main():
     lightL = pygame.transform.flip(light, True, False)
 
 
-
     # Create a 8x3 grid of windows
     windows = [[Window(0, 0, WIDTH, HEIGHT, sprite, hit, row, col) for col in range(GRID_COLS)] for row in range(GRID_ROWS)]
     current_row, current_col = 0, 1  # Start in the center window
     current_window = windows[current_row][current_col]
 
-    # enemy.append(Enemy(300,300,50,50,fish,3))
-    # enemy.append(Enemy(400,400,50,50,squid,1))#
+    # enemy.append(Enemy(300,300,50,50,fish,3, 1))
+    # enemy.append(Enemy(400,400,50,50,squid,1))
     # enemy.append(Enemy(300,200,50,50,big_jelly,2))
     # enemy.append(Enemy(300,400,50,50,anglerfish,2))
-
+    # boss.append(Boss(50, 50, 64, 461, tentacle, 10))
+    boss.append(Boss(400, 50, 64, 461, tentacle, 10))
 
     run = True
     while run:
@@ -399,7 +527,7 @@ def main():
 
         # On-screen Movement
         draw_window(current_window)
-        draw_char(current_window.player,proj,enemy,coll) 
+        draw_char(current_window.player,proj,enemy,coll,boss)
         
         handle_movement(current_window.player,proj)
         current_window.player.draw(window)
@@ -416,6 +544,10 @@ def main():
             filter.blit(light, (current_window.player.rect.x-115,current_window.player.rect.y - 40))
         window.blit(filter, (-10, -10), special_flags=pygame.BLEND_RGBA_SUB)
 
+        health_bar_player.draw(window)
+        if boss != []:
+            health_bar_boss.draw(window)
+
         pygame.display.flip()
 
     pygame.quit()
@@ -424,8 +556,34 @@ def main():
 #     main()
 
 def start_game():
+    global start_time, time_since_pop
+    global dmg_player
+    health_bar_player.hp = 100
+    dmg_player = 50
+    start_time = time.time()
+    time_since_pop = 0
+
+    health_bar_boss.hp = 400
     mixer.music.fadeout(1)
     main()
+
+def game_over():
+    game_over_font = pygame_menu.font.FONT_8BIT
+    game_over_img = pygame_menu.baseimage.BaseImage(image_path = "sprites/GameOver.png", drawing_mode=pygame_menu.baseimage.IMAGE_MODE_FILL)
+    game_over_theme = Theme(background_color = game_over_img, widget_font = game_over_font, title_bar_style = pygame_menu.widgets.MENUBAR_STYLE_NONE)
+
+    mixer.music.fadeout(100)
+    mixer.music.load("./sounds/new_intro.wav")
+    mixer.music.play(-1, 0.0)
+
+    gameover = pygame_menu.Menu("", WIDTH, HEIGHT, theme = game_over_theme)
+    gameover.add.label("Game Over")
+    gameover.add.label("")
+    gameover.add.label("")
+    gameover.add.button("Try again", main_men)
+    gameover.add.button("Exit", pygame_menu.events.EXIT)
+
+    gameover.mainloop(window)
 
 def main_men():
     main_menu_font = pygame_menu.font.FONT_8BIT
