@@ -196,12 +196,14 @@ def handle_movement(player,proj):
     if keys[pygame.K_SPACE]:
         if len(proj) < 1:
             proj.append(projectile(player.rect.x + (-1)**player.flip*24,player.rect.y,16,16,player.hit,player.flip,1))
+    if keys[pygame.K_ESCAPE]:
+        main_men()
 
 
 # --- Main Loop ---
 
 def main():
-    mixer.music.load("./sounds/Vibes.wav")
+    mixer.music.load("./sounds/level1_explore.wav")
     mixer.music.set_volume(50 / 100)
     mixer.music.play(-1,0.0)
     proj = []
@@ -212,9 +214,11 @@ def main():
     sprite = load_sprite("sprites/uboot.png", 32, 32)
     hit = load_sprite("sprites/punch.png", 32,32)
     fish = load_sprite("sprites/fish.png", 32,32)
+    shark = load_sprite("sprites/shark.png", 64, 32)
     
     player = Player(100, 100, 50, 50, sprite,hit)  # Set the player size to 50x50 for visibility
     enemy.append(Enemy(300,300,20,20,fish,2))
+    enemy.append(Enemy(400,400,64,32,shark,1))
 
     run = True
     while run:
@@ -236,16 +240,19 @@ def start_game():
     mixer.music.fadeout(1)
     main()
 
-main_menu_font = pygame_menu.font.FONT_8BIT
-main_menu_img = pygame_menu.baseimage.BaseImage(image_path="./sprites/Main_men_bg.png", drawing_mode=pygame_menu.baseimage.IMAGE_MODE_FILL)
-main_theme = Theme(background_color = main_menu_img, widget_font = main_menu_font, title_bar_style = pygame_menu.widgets.MENUBAR_STYLE_NONE)
+def main_men():
+    main_menu_font = pygame_menu.font.FONT_8BIT
+    main_menu_img = pygame_menu.baseimage.BaseImage(image_path="./sprites/Main_men_bg.png", drawing_mode=pygame_menu.baseimage.IMAGE_MODE_FILL)
+    main_theme = Theme(background_color = main_menu_img, widget_font = main_menu_font, title_bar_style = pygame_menu.widgets.MENUBAR_STYLE_NONE)
 
-mixer.init()
-mixer.music.load('./sounds/main_menu_theme.wav')
-mixer.music.play(-1, 0.0)
+    mixer.init()
+    mixer.music.load('./sounds/main_menu_theme.wav')
+    mixer.music.play(-1, 0.0)
 
-mainmenu = pygame_menu.Menu("", WIDTH, HEIGHT, theme = main_theme)
-mainmenu.add.button("Play", start_game)
-mainmenu.add.button("Exit", pygame_menu.events.EXIT)
+    mainmenu = pygame_menu.Menu("", WIDTH, HEIGHT, theme = main_theme)
+    mainmenu.add.button("Play", start_game)
+    mainmenu.add.button("Exit", pygame_menu.events.EXIT)
 
-mainmenu.mainloop(window)
+    mainmenu.mainloop(window)
+
+main_men()
