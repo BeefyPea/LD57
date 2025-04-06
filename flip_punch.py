@@ -1,6 +1,7 @@
 import pygame
 import random
 import time
+import math
 from os import listdir
 from os.path import isfile, join
 import pygame_menu
@@ -15,12 +16,14 @@ from pygame import mixer
 # --- Constants ---
 WIDTH, HEIGHT = 512, 512
 PLAYER_VEL = 4
+TILE_SIZE = 32
+GRID_ROWS, GRID_COLS = 8, 3  # Grid size
+WINDOW_WIDTH, WINDOW_HEIGHT = WIDTH, HEIGHT
 
 # --- Pygame Setup ---
 pygame.init()
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Das Koks U-Boot")
-
 
 # Load background and scale
 BG = pygame.image.load("sprites/background_fish.png")
@@ -28,15 +31,12 @@ BG = pygame.transform.scale(BG, (WIDTH, HEIGHT))
 
 # --- Helper Functions ---
 def load_sprite(path, width, height):
-    # Load the sprite from the given path
     sprite_sheet = pygame.image.load(path).convert_alpha()
-    
-    # Scale the sprite to the desired width and height (32x32)
     sprite_sheet = pygame.transform.scale(sprite_sheet, (width, height))
-    
     return sprite_sheet
+       
 
-# --- Player Class ---
+# --- Classes ---
 class Player(pygame.sprite.Sprite):
     COLOR = (125, 125, 125)
 
@@ -53,25 +53,32 @@ class Player(pygame.sprite.Sprite):
         self.flip = 0
 
     def move(self, dx, dy):
-        self.rect.x += dx
-        self.rect.y += dy
+        if self.x_vel != 0 and self.y_vel !=0:
+            norm = math.sqrt(2)
+            self.rect.x += dx/norm
+            self.rect.y += dy/norm
+        else:
+            self.rect.x += dx
+            self.rect.y += dy
 
     def move_left(self, vel):
         self.x_vel = -vel
   
-
     def move_right(self, vel):
         self.x_vel = vel
     
-
     def move_up(self, vel):
         self.y_vel = -vel
 
     def move_down(self, vel):
         self.y_vel = vel
 
-    def update(self):
+    def update(self,window_rect):
         self.move(self.x_vel, self.y_vel)
+                # Clamp player within window bounds
+        self.rect.x = max(window_rect.left, min(self.rect.x, window_rect.right - self.width))
+        self.rect.y = max(window_rect.top, min(self.rect.y, window_rect.bottom - self.height))
+
     def draw(self, win):
         # Flip the sprite when moving left, otherwise keep it the same
         if self.x_vel < 0 and self.flip == 0:  # Moving left
@@ -118,7 +125,17 @@ class Enemy(pygame.sprite.Sprite):
             self.speed = speed
             self.flip = 0
 
+        def move(self, dx, dy):
+            if self.x_vel != 0 and self.y_vel !=0:
+                norm = math.sqrt(2)
+                self.rect.x += dx/norm
+                self.rect.y += dy/norm
+            else:
+                self.rect.x += dx
+                self.rect.y += dy
+
         def hunt(self,playerx,playery):
+            self.x_vel = self.y_vel = 0
             distx = self.rect.x - playerx
             disty = self.rect.y - playery
             x = y = 0 
@@ -135,8 +152,11 @@ class Enemy(pygame.sprite.Sprite):
             self.flip = x
 
             if (distx**2 + disty**2)**0.5 < 250:
-                self.rect.x -= x * self.speed
-                self.rect.y -= y * self.speed
+                self.x_vel -= x * self.speed
+                self.y_vel -= y * self.speed
+
+            self.move(self.x_vel,self.y_vel)
+        
 
         def collide(self,proj):
             return pygame.Rect.colliderect(self.rect,proj)
@@ -150,33 +170,127 @@ class Enemy(pygame.sprite.Sprite):
                 self.sprite = fishR
             win.blit(self.sprite, (self.rect.x, self.rect.y))
 
-    
+class Window:
+    def __init__(self, x, y, width, height, player_sprite,player_hit, row, col):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.player = Player(256, 256, 50, 50, player_sprite,player_hit)
+        self.background = pygame.Surface((WIDTH, HEIGHT))
+        self.background.blit(BG, (0, 0))
+        self.row = row
+        self.col = col
+
+    def draw(self, win):
+        win.blit(self.background, (self.rect.x, self.rect.y))
+        self.player.draw(win)
+
+        # Draw outer borders (green) on the edges of the grid
+        border_thickness = 8
+        border_color = (0, 0, 0)
+        if self.row == 0:
+            pygame.draw.line(win, border_color, (0, 0), (WIDTH, 0), border_thickness)
+        if self.row == GRID_ROWS - 1:
+            pygame.draw.line(win, border_color, (0, HEIGHT - 1), (WIDTH, HEIGHT - 1), border_thickness)
+        if self.col == 0:
+            pygame.draw.line(win, border_color, (0, 0), (0, HEIGHT), border_thickness)
+        if self.col == GRID_COLS - 1:
+            pygame.draw.line(win, border_color, (WIDTH - 1, 0), (WIDTH - 1, HEIGHT), border_thickness)
+
+        # Optional: draw a thin red rectangle around each window (debug)
+        pygame.draw.rect(win, (255, 255, 255), self.rect, 2)
+
+    def update(self):
+        self.player.update(self.rect)
+
+    def check_transition(self, current_row, current_col, windows):
+        # Transition right
+        if self.player.rect.right >= self.rect.right and current_col < GRID_COLS - 1:
+            next_window = windows[current_row][current_col + 1]
+            next_window.player.rect.x = next_window.rect.left  # Align player at left of next window
+            next_window.player.rect.y = self.player.rect.y    # Keep same vertical position
+            return current_row, current_col + 1
+
+        # Transition left
+        elif self.player.rect.left <= self.rect.left and current_col > 0:
+            prev_window = windows[current_row][current_col - 1]
+            prev_window.player.rect.x = prev_window.rect.right - prev_window.player.width  # Align player at right of previous window
+            prev_window.player.rect.y = self.player.rect.y    # Keep same vertical position
+            return current_row, current_col - 1
+
+        # Transition down
+        elif self.player.rect.bottom >= self.rect.bottom and current_row < GRID_ROWS - 1:
+            next_window = windows[current_row + 1][current_col]
+            next_window.player.flip = self.player.flip
+            next_window.player.rect.y = next_window.rect.top  # Align player at top of next window
+            next_window.player.rect.x = self.player.rect.x    # Keep same horizontal position
+            return current_row + 1, current_col
+
+        # Transition up
+        elif self.player.rect.top <= self.rect.top and current_row > 0:
+            prev_window = windows[current_row - 1][current_col]
+            prev_window.player.flip = self.player.flip
+            prev_window.player.rect.y = prev_window.rect.bottom - prev_window.player.height  # Align player at bottom of previous window
+            prev_window.player.rect.x = self.player.rect.x    # Keep same horizontal position
+            return current_row - 1, current_col
+
+        return current_row, current_col
+ 
+class Collider(pygame.sprite.Sprite):
+    def __init__(self, x, y, width, height, sprite):
+        super().__init__()
+        self.rect = pygame.Rect(x, y, width, height)
+        self.width = width
+        self.height = height
+        self.sprite = sprite  # The sprite image for the projectile
+
+    def collision_bool(self, entity):
+        return pygame.Rect.colliderect(self.rect,entity.rect)
+
+    def collision_entity(self, entity):
+        if pygame.Rect.colliderect(self.rect,entity.rect) == True:
+            entity.rect.x += -1*entity.x_vel*1
+            entity.rect.y += -1*entity.y_vel*1
+            entity.x_vel = entity.y_vel = 0
+
+    def draw(self,win):
+        win.blit(self.sprite, (self.rect.x, self.rect.y))
+        
+
 
 # --- Game Functions ---
-def draw_window(player,proj,enemy):
-    collider = pygame.Rect(-100,-100,1,1)
-    window.blit(BG, (0, 0))
+def draw_char(player,proj,enemy,walls):
+    coll = []
+    window.blit(BG, (0, 0))   
 
     for ind,punch in enumerate(proj): #check for projectiles, delete if too old
         if time.time() - punch.start > punch.lifespan:
             proj.pop(ind)
         else:
-            collider = punch.rect
+            coll.append(punch.rect)
             punch.fly()
             punch.draw(window)
 
-    for ind,en in enumerate(enemy):
-        if en.collide(collider) == True:
+    for ind,en in enumerate(enemy): #check for enemies, delete if collided
+        for collider in coll:
+            if en.collide(collider) == True:
                 enemy.pop(ind)
                 proj.pop()
         else: 
             en.hunt(player.rect.x,player.rect.y)
             en.draw(window)
 
-    player.draw(window)
-    
-
-    pygame.display.update()
+    for collider in walls:
+        collider.collision_entity(player)
+        collider.draw(window)
+        for en in enemy:
+            collider.collision_entity(en)
+        for ind,punch in enumerate(proj):
+            if collider.collision_bool(punch) == True:
+                proj.pop(ind)
+   
+def draw_window(window_obj):
+    window.fill((0, 0, 0))
+    window_obj.draw(window)
+    #pygame.display.update()
 
 def handle_movement(player,proj):
     keys = pygame.key.get_pressed()
@@ -194,7 +308,7 @@ def handle_movement(player,proj):
         player.move_down(PLAYER_VEL)
     if keys[pygame.K_SPACE]:
         if len(proj) < 1:
-            proj.append(projectile(player.rect.x + (-1)**player.flip*24,player.rect.y,16,16,player.hit,player.flip,1))
+            proj.append(projectile(player.rect.x + (-1)**player.flip*24,player.rect.y,16,16,player.hit,player.flip,0.5))
     if keys[pygame.K_ESCAPE]:
         main_men()
 
@@ -202,11 +316,31 @@ def handle_movement(player,proj):
 # --- Main Loop ---
 
 def main():
-    mixer.music.load("./sounds/level1_explore.wav")
-    mixer.music.set_volume(50 / 100)
-    mixer.music.play(-1,0.0)
     proj = []
     enemy = []
+    coll = []
+    mixer.music.load("./sounds/level1_explore.wav")
+    mixer.music.play(-1, 0.0)
+
+    y_walls = [[0,0], #0
+               [0,0], #1
+               [0,0],
+               [0,0],
+               [0,0],
+               [0,0],
+               [0,0],
+               [0,0]]
+    
+    x_walls = [[0,0,0], #0
+               [0,0,0], #1
+               [0,0,0],
+               [0,0,0],
+               [0,0,0],
+               [0,0,0],
+               [0,0,0],
+               [0,0,0]]
+    
+
     clock = pygame.time.Clock()
     
     # Load the sprite (assuming the file is "uboot.png" and we upscale it to 32x32)
@@ -216,23 +350,68 @@ def main():
     shark = load_sprite("sprites/shark.png", 64, 32)
     jellyfish1 = load_sprite("sprites/jellyfish1.png", 32, 32)
     jellyfish2 = load_sprite("sprites/jellyfish2.png", 32, 32)
-    
-    player = Player(100, 100, 50, 50, sprite,hit)  # Set the player size to 50x50 for visibility
-    enemy.append(Enemy(300,300,20,20,fish,2))
-    enemy.append(Enemy(400,400,64,32,shark,1))
-    enemy.append(Enemy(300,400,32,32,jellyfish2,1))
-    enemy.append(Enemy(200,400,32,32,jellyfish1,1))
+    coll_x = load_sprite("sprites/coll_x.png", 512,40)
+    coll_y = load_sprite("sprites/coll_y.png", 40,512)
+    light = load_sprite("sprites/kegel.png", 128,128)
+    lightR = light
+    lightL = pygame.transform.flip(light, True, False)
+
+
+
+    # Create a 8x3 grid of windows
+    windows = [[Window(0, 0, WIDTH, HEIGHT, sprite, hit, row, col) for col in range(GRID_COLS)] for row in range(GRID_ROWS)]
+    current_row, current_col = 0, 1  # Start in the center window
+    current_window = windows[current_row][current_col]
+
+    enemy.append(Enemy(300,300,50,50,fish,3))
+    enemy.append(Enemy(400,400,50,50,shark,1))
+    enemy.append(Enemy(300,200,50,50,jellyfish1,2))
+    enemy.append(Enemy(300,400,50,50,jellyfish2,2))
 
     run = True
     while run:
         clock.tick(60)
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                run = False
-        handle_movement(player,proj)
+                run = False     
+
+        # Check for transitions and update the window
+        current_row, current_col = current_window.check_transition(current_row, current_col, windows)
+        current_window = windows[current_row][current_col]
+        coll = []
+       
+        if x_walls[current_row][current_col] == 1:
+            coll.append(Collider(0,500,512,40,coll_x))
+        if x_walls[current_row-1][current_col] == 1:
+            coll.append(Collider(0,-15,512,40,coll_x))
+
+        if y_walls[current_row][current_col-1] == 1:
+            coll.append(Collider(-15,0,40,512,coll_y))
+        if current_col < 2:    
+            if y_walls[current_row][current_col] == 1:
+                coll.append(Collider(497,0,40,512,coll_y))
+
+        # On-screen Movement
+        draw_window(current_window)
+        draw_char(current_window.player,proj,enemy,coll) 
         
-        player.update()
-        draw_window(player,proj,enemy)
+        handle_movement(current_window.player,proj)
+        current_window.player.draw(window)
+        current_window.update() 
+
+        #Light updating
+        filter = pygame.surface.Surface((540, 540))
+        filter.fill((60,60,60))
+        if current_window.player.flip == 0:  # Moving right
+            light = lightR
+            filter.blit(light, (current_window.player.rect.x+40,current_window.player.rect.y - 40))
+        elif current_window.player.flip == 1:  # Moving left
+            light = lightL   
+            filter.blit(light, (current_window.player.rect.x-115,current_window.player.rect.y - 40))
+        window.blit(filter, (-10, -10), special_flags=pygame.BLEND_RGBA_SUB)
+
+        pygame.display.flip()
 
     pygame.quit()
 
