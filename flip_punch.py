@@ -11,7 +11,6 @@ from pygame_menu.themes import Theme
 import pygame_menu.widgets
 from pygame.locals import *
 from pygame import mixer
-from pygame_widgets.slider import Slider
 
 # --- Constants ---
 WIDTH, HEIGHT = 512, 512
@@ -215,10 +214,14 @@ def main():
     hit = load_sprite("sprites/punch.png", 32,32)
     fish = load_sprite("sprites/fish.png", 32,32)
     shark = load_sprite("sprites/shark.png", 64, 32)
+    jellyfish1 = load_sprite("sprites/jellyfish1.png", 32, 32)
+    jellyfish2 = load_sprite("sprites/jellyfish2.png", 32, 32)
     
     player = Player(100, 100, 50, 50, sprite,hit)  # Set the player size to 50x50 for visibility
     enemy.append(Enemy(300,300,20,20,fish,2))
     enemy.append(Enemy(400,400,64,32,shark,1))
+    enemy.append(Enemy(300,400,32,32,jellyfish2,1))
+    enemy.append(Enemy(200,400,32,32,jellyfish1,1))
 
     run = True
     while run:
