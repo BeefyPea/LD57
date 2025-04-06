@@ -219,9 +219,8 @@ class Boss(pygame.sprite.Sprite):
 
         self.attacks = []  # Liste mit Angriffen
         self.rage = False
-
+    
     def attack(self, player_pos):
-        
         
         if health_bar_boss.hp >= health_bar_boss.max_hp * 0.5:
             self.attack_cooldown = 1.5    # Sek. bis zur nächsten Warnung
@@ -447,6 +446,12 @@ def draw_char(player,proj,enemy,walls, boss, items):
         if collected == True:
             items.pop(int)
        
+def update_music(file):
+    mixer.music.fadeout(1)
+    mixer.music.unload
+    mixer.music.load(f"./sounds/{file}.wav")
+    mixer.music.play(-1, 0.0)
+
 
 def draw_window(window_obj):
     window.fill((0, 0, 0))
@@ -540,7 +545,8 @@ def main():
     # enemy.append(Enemy(300,200,50,50,big_jelly,2))
     # enemy.append(Enemy(300,400,50,50,anglerfish,2))
     # boss.append(Boss(50, 50, 64, 461, tentacle, 10))
-    # boss.append(Boss(400, 50, 64, 412, tentacle, 5))
+    # update_music("intro_epic_ver")
+    boss.append(Boss(400, 50, 64, 412, tentacle, 5)), update_music("intro_epic_ver")
     # items.append(Pickup(200, 200, 32, 32, item1, "hp_buff"))
     # items.append(Pickup(200, 200, 32, 32, item1, "light_buff"))
     
