@@ -206,7 +206,7 @@ class Enemy(pygame.sprite.Sprite):
             win.blit(self.sprite, (self.rect.x, self.rect.y))
 
 class Boss(pygame.sprite.Sprite):
-    def __init__(self, x, y, width, height, sprite, ad):
+    def __init__(self, x, y, width, height, sprite, ad, bg_sprite):
         super().__init__()
         self.rect = pygame.Rect(x, y, width, height)
         self.x = x
@@ -216,11 +216,15 @@ class Boss(pygame.sprite.Sprite):
         self.sprite = sprite
         self.dmg = ad
         self.last_attack_time = time.time()
+        self.bg_sprite = bg_sprite
 
         self.attacks = []  # Liste mit Angriffen
         self.rage = False
     
     def attack(self, player_pos):
+        # --- add boss bg png, ideally right above background layer ---
+        boss_bg = pygame.Surface((WIDTH,HEIGHT))    #  useless, fix
+        window.blit(self.bg_sprite, (0,0))          # updates layer over projectiles, fix needed
         
         if health_bar_boss.hp >= health_bar_boss.max_hp * 0.5:
             self.attack_cooldown = 1.5    # Sek. bis zur nächsten Warnung
@@ -282,7 +286,6 @@ class Boss(pygame.sprite.Sprite):
                         sprite = pygame.transform.rotate(self.sprite, 90)
                     window.blit(sprite, (atk['rect'].x, atk['rect'].y))
                     if atk['rect'].colliderect(player.rect):
-                        print()
                         health_bar_player.hp -= self.dmg
                     updated_attacks.append(atk)
 
@@ -527,10 +530,12 @@ def main():
     big_jelly = load_sprite("sprites/big_jelly.png", 32, 64)
     squid = load_sprite("sprites/squid.png", 32, 32)
     tentacle = load_sprite("sprites/tentacle.png", 64, 412)
+    big_boss = load_sprite("sprites/big_boy_okto.png", 512, 512)
     coll_x = load_sprite("sprites/coll_x.png", 512,40)
     coll_y = load_sprite("sprites/coll_y.png", 40,512)
     light = load_sprite("sprites/kegel.png", 128,128)
     item1 = load_sprite("sprites/item1.png", 16, 16)
+    item2 = load_sprite("sprites/item2.png", 16, 16)
     lightR = light
     lightL = pygame.transform.flip(light, True, False)
 
@@ -546,9 +551,9 @@ def main():
     # enemy.append(Enemy(300,400,50,50,anglerfish,2))
     # boss.append(Boss(50, 50, 64, 461, tentacle, 10))
     # update_music("intro_epic_ver")
-    boss.append(Boss(400, 50, 64, 412, tentacle, 5)), update_music("intro_epic_ver")
-    # items.append(Pickup(200, 200, 32, 32, item1, "hp_buff"))
-    # items.append(Pickup(200, 200, 32, 32, item1, "light_buff"))
+    boss.append(Boss(400, 50, 64, 412, tentacle, 5, big_boss)), update_music("intro_epic_ver")
+    items.append(Pickup(300, 200, 32, 32, item1, "hp_buff"))
+    items.append(Pickup(200, 200, 32, 32, item2, "light_buff"))
     
 
     run = True
