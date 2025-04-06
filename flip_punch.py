@@ -319,7 +319,7 @@ def main():
     proj = []
     enemy = []
     coll = []
-    mixer.music.load("./sounds/level1_explore.wav")
+    mixer.music.load("./sounds/level2.wav")
     mixer.music.play(-1, 0.0)
 
     y_walls = [[0,0], #0
