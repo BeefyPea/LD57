@@ -221,15 +221,22 @@ class Boss(pygame.sprite.Sprite):
         self.rage = False
 
     def attack(self, player_pos):
-        self.attack_cooldown = 2  # Sek. bis zur nächsten Warnung
-        self.warning_duration = 1  # Sek. Warnung
-        self.attack_duration = 2     # Sek. aktiver Angriff
         
-        if health_bar_boss.hp >= health_bar_boss.max_hp * 0.7:
+        
+        if health_bar_boss.hp >= health_bar_boss.max_hp * 0.5:
+            self.attack_cooldown = 1.5    # Sek. bis zur nächsten Warnung
+            self.warning_duration = 1.5   # Sek. Warnung
+            self.attack_duration = 1.5    # Sek. aktiver Angriff
             self.rage = False
-        if health_bar_boss.hp < health_bar_boss.max_hp * 0.5:
-            self.rage = True
 
+        if health_bar_boss.hp < health_bar_boss.max_hp * 0.5:
+            for index,item in enumerate(self.attacks):
+                if item['rage'] == False:
+                    self.attacks.pop(index)
+            self.rage = True
+            self.attack_cooldown = 1
+            self.warning_duration = .75
+            self.attack_duration = 1
 
         current_time = time.time()
         if current_time - self.last_attack_time >= self.attack_cooldown:
@@ -237,7 +244,7 @@ class Boss(pygame.sprite.Sprite):
 
             if self.rage == False:
                 x = player_pos[0] - 32
-                y = 50
+                y = 100
                 attack_rect = pygame.Rect(x, y, 64, 412)
 
             if self.rage == True:
@@ -251,8 +258,8 @@ class Boss(pygame.sprite.Sprite):
                 'warning_start': current_time,
                 'attack_start': None,
                 'state': 'warning',
+                'rage' : self.rage,
             })
-
 
     def update_attacks(self, window, player, proj):
         current_time = time.time()
@@ -276,6 +283,7 @@ class Boss(pygame.sprite.Sprite):
                         sprite = pygame.transform.rotate(self.sprite, 90)
                     window.blit(sprite, (atk['rect'].x, atk['rect'].y))
                     if atk['rect'].colliderect(player.rect):
+                        print()
                         health_bar_player.hp -= self.dmg
                     updated_attacks.append(atk)
 
@@ -286,12 +294,10 @@ class Boss(pygame.sprite.Sprite):
                             updated_attacks.append(atk)  # Tentakelangriff beibehalten
                             health_bar_boss.hp -= dmg_player
 
-
-
 class Window:
     def __init__(self, x, y, width, height, player_sprite,player_hit, row, col):
         self.rect = pygame.Rect(x, y, width, height)
-        self.player = Player(256, 256, 50, 50, player_sprite,player_hit)
+        self.player = Player(256, 256, 32, 32, player_sprite, player_hit)
         self.background = pygame.Surface((WIDTH, HEIGHT))
         self.background.blit(BG, (0, 0))
         self.row = row
@@ -372,10 +378,36 @@ class Collider(pygame.sprite.Sprite):
     def draw(self,win):
         win.blit(self.sprite, (self.rect.x, self.rect.y))
         
+class Pickup(pygame.sprite.Sprite):
+    def __init__(self, xpos, ypos, width, height, sprite, item):
+        super().__init__()
+        self.xpos = xpos
+        self.ypos = ypos
+        self.width = width
+        self.height = height
+        self.sprite = sprite
+        self.item = item
 
+        self.rect = pygame.Rect(xpos, ypos, width, height)
+        self.item_count = 1
+
+    def buff(self, player_pos):
+        global light_value
+        player_rect = pygame.Rect(player_pos[0], player_pos[1], 50, 50)
+        for item in range(0, self.item_count):
+            window.blit(self.sprite, (self.xpos, self.ypos))
+
+        if pygame.Rect.colliderect(self.rect, player_rect):
+            if self.item == "hp_buff":
+                health_bar_player.hp += 20
+                return(True)
+            if self.item == "light_buff":
+                if light_value > 10:
+                    light_value -= 10
+                return(True)
 
 # --- Game Functions ---
-def draw_char(player,proj,enemy,walls, boss):
+def draw_char(player,proj,enemy,walls, boss, items):
     global start_time, time_since_pop, boss_beaten
     coll = []
     window.blit(BG, (0, 0))   
@@ -409,6 +441,11 @@ def draw_char(player,proj,enemy,walls, boss):
     for boss_obj in boss:
         boss_obj.attack(player.rect.center)
         boss_obj.update_attacks(window, player, proj)
+
+    for int,thing in enumerate(items):
+        collected = thing.buff(player.rect.center)
+        if collected == True:
+            items.pop(int)
        
 
 def draw_window(window_obj):
@@ -437,15 +474,18 @@ def handle_movement(player,proj):
 
 # --- define healthbars ---
 health_bar_player = healthbar(25,25,100,10,100,"player")
-health_bar_boss = healthbar(50, 462, 400, 25, 400, "boss")
+health_bar_boss = healthbar(50, 462, 400, 25, 500, "boss")
 
 # --- Main Loop ---
 
 def main():
+    global light_value
     proj = []
     enemy = []
     coll = []
     boss = []
+    items = []
+    light_value = 90
     mixer.music.load("./sounds/Vibes.wav")
     mixer.music.play(-1, 0.0)
 
@@ -485,6 +525,7 @@ def main():
     coll_x = load_sprite("sprites/coll_x.png", 512,40)
     coll_y = load_sprite("sprites/coll_y.png", 40,512)
     light = load_sprite("sprites/kegel.png", 128,128)
+    item1 = load_sprite("sprites/item1.png", 16, 16)
     lightR = light
     lightL = pygame.transform.flip(light, True, False)
 
@@ -499,7 +540,10 @@ def main():
     # enemy.append(Enemy(300,200,50,50,big_jelly,2))
     # enemy.append(Enemy(300,400,50,50,anglerfish,2))
     # boss.append(Boss(50, 50, 64, 461, tentacle, 10))
-    boss.append(Boss(400, 50, 64, 461, tentacle, 10))
+    # boss.append(Boss(400, 50, 64, 412, tentacle, 5))
+    # items.append(Pickup(200, 200, 32, 32, item1, "hp_buff"))
+    # items.append(Pickup(200, 200, 32, 32, item1, "light_buff"))
+    
 
     run = True
     while run:
@@ -527,7 +571,7 @@ def main():
 
         # On-screen Movement
         draw_window(current_window)
-        draw_char(current_window.player,proj,enemy,coll,boss)
+        draw_char(current_window.player,proj,enemy,coll,boss,items)
         
         handle_movement(current_window.player,proj)
         current_window.player.draw(window)
@@ -535,7 +579,7 @@ def main():
 
         #Light updating
         filter = pygame.surface.Surface((540, 540))
-        filter.fill((90,90,90))
+        filter.fill((light_value,light_value,light_value))
         if current_window.player.flip == 0:  # Moving right
             light = lightR
             filter.blit(light, (current_window.player.rect.x+40,current_window.player.rect.y - 40))
@@ -563,7 +607,7 @@ def start_game():
     start_time = time.time()
     time_since_pop = 0
 
-    health_bar_boss.hp = 400
+    health_bar_boss.hp = 500
     mixer.music.fadeout(1)
     main()
 
