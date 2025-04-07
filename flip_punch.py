@@ -453,9 +453,15 @@ class Pickup(pygame.sprite.Sprite):
         if pygame.Rect.colliderect(self.rect, player_rect):
             if self.name == "hp_buff" and health_bar_player.hp <= health_bar_player.max_hp-20:
                 health_bar_player.hp += 20
+
+            # -- useless atm, need to change how light value is handled --
             if self.name == "light_buff":
                 if light_value > 10:
                     light_value -= 10
+
+            if self.name == "oxygen_buff":
+                drowning_bar_player.hp = drowning_bar_player.max_hp+1
+
             self.dict['status'] = True
 
 # --- Game Functions ---
@@ -621,13 +627,13 @@ def main():
         'koords' : (213,383),
         'sprite' : item1, 
         'status' : False 
-        },  {
+        },{
         'name' : 'hp_buff',
         'room' : (2,4),
         'koords' : (186, 475),
         'sprite' : item1,
         'status' : False
-        },  {
+        },{
         'name' : 'hp_buff',
         'room' : (2,2),
         'koords' : (434, 387),
@@ -638,6 +644,12 @@ def main():
         'room' : (0,4),
         'koords' : (222, 436),
         'sprite' : item1,
+        'status' : False
+        },{
+        'name' : 'oxygen_buff',
+        'room' : (4,4),
+        'koords' : (369, 427),
+        'sprite' : item2,
         'status' : False
     }]
 
