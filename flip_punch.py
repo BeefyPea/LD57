@@ -67,8 +67,8 @@ class healthbar():
                 game_over()
         if self.parent == "boss":
             if self.w * self.hp / self.max_hp != 0:
-                pygame.draw.rect(surface, "darkred", (self.x, self.y, self.w, self.h))
-                pygame.draw.rect(surface, "purple", (self.x, self.y, self.w * ratio, self.h))
+                pygame.draw.rect(surface, "darkkhaki", (self.x, self.y, self.w, self.h))
+                pygame.draw.rect(surface, "yellow", (self.x, self.y, self.w * ratio, self.h))
             if self.w * self.hp / self.max_hp <= 0:
                 main_men()
         if self.parent == "depth":
@@ -234,9 +234,7 @@ class Boss(pygame.sprite.Sprite):
         self.rage = False
     
     def attack(self, player_pos):
-        # --- add boss bg png, ideally right above background layer ---
-        boss_bg = pygame.Surface((WIDTH,HEIGHT))    #  useless, fix
-        window.blit(self.bg_sprite, (0,0))          # updates layer over projectiles, fix needed
+        update_music("intro_epic_ver")
         
         if health_bar_boss.hp >= health_bar_boss.max_hp * 0.5:
             self.attack_cooldown = 1.5    # Sek. bis zur nächsten Warnung
@@ -319,17 +317,21 @@ class Boss(pygame.sprite.Sprite):
                             health_bar_boss.hp -= dmg_player
 
 class Window:
-    def __init__(self, x, y, width, height, player_sprite,player_hit, row, col):
+    def __init__(self, x, y, width, height, player_sprite,player_hit, row, col, items):
         self.rect = pygame.Rect(x, y, width, height)
         self.player = Player(256, 256, 32, 32, player_sprite, player_hit)
         self.background = pygame.Surface((WIDTH, HEIGHT))
         # self.background.blit(BG, (0, 0))
         self.row = row
         self.col = col
+        self.items = items
 
     def update_cutout(self,win):
         cutout = pygame.Rect(self.col*512,self.row*512,512,512)
         self.background.blit(BG, (0, 0),cutout)
+        if self.col == 0 and self.row == 2:
+            boss_sprite = load_sprite("sprites/big_boy_okto.png", 512, 512)
+            self.background.blit(boss_sprite, (0,0))
 
     def draw(self, win):
         self.update_cutout(win)
@@ -348,10 +350,8 @@ class Window:
         if self.col == GRID_COLS - 1:
             pygame.draw.line(win, border_color, (WIDTH - 1, 0), (WIDTH - 1, HEIGHT), border_thickness)
 
-        # Optional: draw a thin red rectangle around each window (debug)
-        # pygame.draw.rect(win, (255, 255, 255), self.rect, 2)
-
     def update(self):
+        self.items.clear()
         self.player.update(self.rect)
 
     def check_transition(self, current_row, current_col, windows):
@@ -428,16 +428,20 @@ class Minimap(pygame.sprite.Sprite):
         pygame.draw.circle(window,"RED",circle_pos,2)
 
 class Pickup(pygame.sprite.Sprite):
-    def __init__(self, xpos, ypos, width, height, sprite, item):
+    def __init__(self, width, height, item):
         super().__init__()
-        self.xpos = xpos
-        self.ypos = ypos
+        self.dict = item
+
+        self.xpos = item['koords'][0]
+        self.ypos = item['koords'][1]
+        self.name = item['name']
+        self.gotten = item['status']
+
         self.width = width
         self.height = height
-        self.sprite = sprite
-        self.item = item
+        self.sprite = item['sprite']
 
-        self.rect = pygame.Rect(xpos, ypos, width, height)
+        self.rect = pygame.Rect(self.xpos, self.ypos, width, height)
         self.item_count = 1
 
     def buff(self, player_pos):
@@ -447,13 +451,12 @@ class Pickup(pygame.sprite.Sprite):
             window.blit(self.sprite, (self.xpos, self.ypos))
 
         if pygame.Rect.colliderect(self.rect, player_rect):
-            if self.item == "hp_buff":
+            if self.name == "hp_buff" and health_bar_player.hp <= health_bar_player.max_hp-20:
                 health_bar_player.hp += 20
-                return(True)
-            if self.item == "light_buff":
+            if self.name == "light_buff":
                 if light_value > 10:
                     light_value -= 10
-                return(True)
+            self.dict['status'] = True
 
 # --- Game Functions ---
 def draw_char(player,proj,enemy,walls, boss, items):
@@ -492,16 +495,17 @@ def draw_char(player,proj,enemy,walls, boss, items):
         boss_obj.update_attacks(window, player, proj)
 
     for int,thing in enumerate(items):
-        collected = thing.buff(player.rect.center)
-        if collected == True:
+        thing.buff(player.rect.center)
+        if thing.gotten == True:
             items.pop(int)
        
-def update_music(file):
-    mixer.music.fadeout(1)
-    mixer.music.unload
-    mixer.music.load(f"./sounds/{file}.wav")
-    mixer.music.play(-1, 0.0)
-
+def update_music(track_path, loop=-1):
+    global _current_track
+    if _current_track != track_path:
+        mixer.music.unload
+        mixer.music.load(f'./sounds/{track_path}.wav')
+        mixer.music.play(loop)
+        _current_track = track_path
 
 def draw_window(window_obj):
     window.fill((0, 0, 0))
@@ -528,12 +532,15 @@ def handle_movement(player,proj,cooldown):
             proj.append(projectile(player.rect.x + (-1)**player.flip*24,player.rect.y,16,16,player.hit,player.flip,0.5))
     if keys[pygame.K_ESCAPE]:
         main_men()
+    if keys[pygame.K_p]:
+        print(f'current x-pos: {player.rect.center[0]}  current y-pos: {player.rect.center[1]}')
 
-# --- define healthbars ---
+# --- some global variables ---
 health_bar_player = healthbar(80,25,100,10,100,"player")
 drowning_bar_player = healthbar(80,40,100,10,180,"depth")
-health_bar_boss = healthbar(80, 462, 400, 25, 400, "boss")
+health_bar_boss = healthbar(25, 475, 462, 25, 400, "boss")
 cooldown = 0.5
+_current_track = "new intro"
 
 # --- dialogue ---
 def draw_dialogue_box(win, text):
@@ -563,12 +570,12 @@ def main():
     boss = []
     items = []
     light_value = 90
-    mixer.music.load("./sounds/Vibes.wav")
+    update_music("Vibes")
     ambience = mixer.Sound("./sounds/ambience.mp3")
     mixer.Sound.play(ambience, -1)
     mixer.Sound.set_volume(ambience, 1)
-    mixer.music.play(-1, 0.0)
 
+    # --- walls ---
     y_walls = [[0,0,0,0],
                [0,1,0,1],
                [0,1,1,1],
@@ -603,26 +610,41 @@ def main():
     coll_x = load_sprite("sprites/coll_x.png", 512,40)
     coll_y = load_sprite("sprites/coll_y.png", 40,512)
     light = load_sprite("sprites/kegel.png", 128,128)
-    item1 = load_sprite("sprites/item1.png", 16, 16)
+    item1 = load_sprite("sprites/item1.png", 32, 32)
     item2 = load_sprite("sprites/item2.png", 16, 16)
     lightR = light
     lightL = pygame.transform.flip(light, True, False)
 
+    items_dict = [{
+        'name' : 'hp_buff',
+        'room' : (1,3),
+        'koords' : (213,383),
+        'sprite' : item1, 
+        'status' : False 
+        },  {
+        'name' : 'hp_buff',
+        'room' : (2,4),
+        'koords' : (186, 475),
+        'sprite' : item1,
+        'status' : False
+        },  {
+        'name' : 'hp_buff',
+        'room' : (2,2),
+        'koords' : (434, 387),
+        'sprite' : item1,
+        'status' : False
+        },{
+        'name' : 'hp_buff',
+        'room' : (0,4),
+        'koords' : (222, 436),
+        'sprite' : item1,
+        'status' : False
+    }]
 
     # Create a 8x3 grid of windows
-    windows = [[Window(0, 0, WIDTH, HEIGHT, sprite, hit, row, col) for col in range(GRID_COLS)] for row in range(GRID_ROWS)]
+    windows = [[Window(0, 0, WIDTH, HEIGHT, sprite, hit, row, col, items) for col in range(GRID_COLS)] for row in range(GRID_ROWS)]
     current_row, current_col = 0, 2  # Start in the center window
     current_window = windows[current_row][current_col]
-
-    # enemy.append(Enemy(300,300,50,50,fish,3, 1))
-    # enemy.append(Enemy(400,400,50,50,squid,1))
-    # enemy.append(Enemy(300,200,50,50,big_jelly,2))
-    # enemy.append(Enemy(300,400,50,50,anglerfish,2))
-    # boss.append(Boss(50, 50, 64, 461, tentacle, 10))
-    # update_music("intro_epic_ver")
-    # boss.append(Boss(400, 50, 64, 412, tentacle, 5, big_boss)), update_music("intro_epic_ver")
-    # items.append(Pickup(300, 200, 32, 32, item1, "hp_buff"))
-    # items.append(Pickup(200, 200, 32, 32, item2, "light_buff"))
 
     # Initialize Minimap
     minimap = Minimap(10,10,64,64,MM)    
@@ -663,11 +685,6 @@ def main():
 
         # On-screen Movement
         draw_window(current_window)
-        # draw_char(current_window.player,proj,enemy,coll,boss,items)
-        
-        # handle_movement(current_window.player,proj)
-        # current_window.player.draw(window)
-        # current_window.update() 
 
         # ----------spawn enemys --------
         if current_row == 1 and current_col == 2:  
@@ -689,6 +706,10 @@ def main():
             if elapsed_time < enemy_spawn_duration:
                 enemy.append(Enemy(300, 300, 30, 30, fish3, 2, 2))
 
+        for item in items_dict:
+            if current_col == item['room'][0] and current_row == item['room'][1] and item['status'] == False:
+                items.append(Pickup(32, 32, item))
+
 
         health_bar_player.draw(window)
 
@@ -707,25 +728,17 @@ def main():
         current_window.player.draw(window)
         current_window.update() 
 
-        # #Light updating
-        # filter = pygame.surface.Surface((540, 540))
-        # filter.fill((light_value,light_value,light_value))
-        # if current_window.player.flip == 0:  # Moving right
-        #     light = lightR
-        #     filter.blit(light, (current_window.player.rect.x+40,current_window.player.rect.y - 40))
-        # elif current_window.player.flip == 1:  # Moving left
-        #     light = lightL   
-        #     filter.blit(light, (current_window.player.rect.x-115,current_window.player.rect.y - 40))
-        # window.blit(filter, (-10, -10), special_flags=pygame.BLEND_RGBA_SUB)
-
         # Light rendering
         filter = pygame.surface.Surface((512, 512))
         if current_row <= 1:
-            filter.fill((90, 90, 90))
+            light_vacl_1 = 90
+            filter.fill((light_vacl_1, light_vacl_1, light_vacl_1))
         elif current_row == 2:
-            filter.fill((100, 100, 100))
+            light_vacl_2 = 100
+            filter.fill((light_vacl_2, light_vacl_2, light_vacl_2))
         elif current_row > 2:
-            filter.fill((120, 120, 120))
+            light_vacl_3 = 120
+            filter.fill((light_vacl_3, light_vacl_3, light_vacl_3))
 
         if current_window.player.flip == 0:
             light = lightR
@@ -735,11 +748,6 @@ def main():
             filter.blit(light, (current_window.player.rect.x - 125, current_window.player.rect.y - 50))
         window.blit(filter, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
 
-        # health_bar_player.draw(window)
-        # if boss != []:
-        #     health_bar_boss.draw(window)
-
-
         # --- DEPTH METER ---
         player_y = current_window.player.rect.y
         depth = current_row * 100 + int((player_y / HEIGHT) * 100)
@@ -747,8 +755,8 @@ def main():
             drowning_bar_player.hp -= 1/60
         elif depth <= 3 and drowning_bar_player.hp < 180:
             drowning_bar_player.hp += 40/60
-        shadow_text = font.render(f"Depth: {depth} m", True, (0, 0, 0))
-        depth_text = font.render(f"Depth: {depth} m", True, (255, 255, 255))
+        shadow_text = font.render(f"Depth: {depth*2} m", True, (0, 0, 0))
+        depth_text = font.render(f"Depth: {depth*2} m", True, (255, 255, 255))
         drowning_text = font.render(f"{int(drowning_bar_player.hp/1.8)}%", True, ("Lightblue"))
         health_text = font.render(f"{int(health_bar_player.hp/health_bar_player.max_hp * 100)}", True, ("green"))
         window.blit(shadow_text, (95, 11))  # Shadow for #contrast
@@ -782,8 +790,6 @@ def main():
 
     pygame.quit()
 
-# if __name__ == "__main__":
-#     main()
 
 def start_game():
     global start_time, time_since_pop
@@ -794,8 +800,7 @@ def start_game():
     start_time = time.time()
     time_since_pop = 0
 
-    health_bar_boss.hp = 500
-    mixer.music.fadeout(1)
+    health_bar_boss.hp = 400
     main()
 
 def game_over():
@@ -803,9 +808,8 @@ def game_over():
     game_over_img = pygame_menu.baseimage.BaseImage(image_path = "sprites/GameOver.png", drawing_mode=pygame_menu.baseimage.IMAGE_MODE_FILL)
     game_over_theme = Theme(background_color = game_over_img, widget_font = game_over_font, title_bar_style = pygame_menu.widgets.MENUBAR_STYLE_NONE)
 
-    mixer.music.fadeout(100)
-    mixer.music.load("./sounds/new_intro.wav")
-    mixer.music.play(-1, 0.0)
+    mixer.init()
+    update_music("new_intro")
 
     if mixer.get_busy():
         mixer.stop()
@@ -820,13 +824,13 @@ def game_over():
     gameover.mainloop(window)
 
 def main_men():
+    global _current_track
     main_menu_font = pygame_menu.font.FONT_8BIT
     main_menu_img = pygame_menu.baseimage.BaseImage(image_path="./sprites/Main_men_bg.png", drawing_mode=pygame_menu.baseimage.IMAGE_MODE_FILL)
     main_theme = Theme(background_color = main_menu_img, widget_font = main_menu_font, title_bar_style = pygame_menu.widgets.MENUBAR_STYLE_NONE)
 
     mixer.init()
-    mixer.music.load('./sounds/new_intro.wav')
-    mixer.music.play(-1, 0.0)
+    update_music("new_intro")
 
     if mixer.get_busy():
         mixer.stop()
