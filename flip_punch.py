@@ -57,13 +57,13 @@ class healthbar():
         if self.parent == "player":
             pygame.draw.rect(surface, "darkred", (self.x, self.y, self.w, self.h))
             pygame.draw.rect(surface, "green", (self.x, self.y, self.w * ratio, self.h))
-            if self.w * self.hp / self.max_hp == 0:
+            if self.w * self.hp / self.max_hp <= 0:
                 game_over()
         if self.parent == "boss":
             if self.w * self.hp / self.max_hp != 0:
                 pygame.draw.rect(surface, "darkred", (self.x, self.y, self.w, self.h))
                 pygame.draw.rect(surface, "purple", (self.x, self.y, self.w * ratio, self.h))
-            if self.w * self.hp / self.max_hp == 0:
+            if self.w * self.hp / self.max_hp <= 0:
                 main_men()
             
 
@@ -249,10 +249,15 @@ class Boss(pygame.sprite.Sprite):
                 x = player_pos[0] - 32
                 y = 100
                 attack_rect = pygame.Rect(x, y, 64, 412)
+                flip = "None"
 
             if self.rage == True:
                 x = [0,100]
                 x = random.choice(x)
+                if x == 0:
+                    flip = "left"
+                if x == 100:
+                    flip = "right"
                 y = player_pos[1]- 32
                 attack_rect = pygame.Rect(x, y, 412, 64)
 
@@ -262,6 +267,7 @@ class Boss(pygame.sprite.Sprite):
                 'attack_start': None,
                 'state': 'warning',
                 'rage' : self.rage,
+                'flip' : flip
             })
 
     def update_attacks(self, window, player, proj):
@@ -283,7 +289,11 @@ class Boss(pygame.sprite.Sprite):
                 if current_time - atk['attack_start'] < self.attack_duration:
                     sprite = self.sprite
                     if self.rage == True:
-                        sprite = pygame.transform.rotate(self.sprite, 90)
+                        sprite = pygame.transform.rotate(sprite, 90)
+                        if atk['flip'] == "left":
+                            sprite = pygame.transform.flip(sprite, True, False)
+                        if atk['flip'] == "right":
+                            sprite = pygame.transform.flip(sprite, False, False)
                     window.blit(sprite, (atk['rect'].x, atk['rect'].y))
                     if atk['rect'].colliderect(player.rect):
                         health_bar_player.hp -= self.dmg
