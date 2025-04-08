@@ -35,8 +35,8 @@ MM = pygame.transform.scale(MM, (64, 64))
 
 boss_beaten = False
 
-shoot = mixer.Sound("./sounds/shoot-6.mp3")
-mixer.Sound.set_volume(shoot,0.08)
+shoot = mixer.Sound("./sounds/shoot.mp3")
+mixer.Sound.set_volume(shoot,0.5)
 
 # --- Helper Functions ---
 def load_sprite(path, width, height):
@@ -156,18 +156,30 @@ class projectile(pygame.sprite.Sprite):
         self.rect.x += PLAYER_VEL*2 * (-1)**self.flip
 
 class Enemy(pygame.sprite.Sprite):
-        def __init__(self, x, y, width, height, sprite, speed ,ad):
+        def __init__(self, dict):
             super().__init__()
-            self.rect = pygame.Rect(x, y, width, height)
+            self.dict = dict
+            self.rect = pygame.Rect(dict['pos'][0],dict['pos'][1] ,dict['size'] ,dict['size'])
             self.x_vel = 0
             self.y_vel = 0
-            self.width = width
-            self.height = height
-            self.sprite = sprite  # The sprite image for the player
-            self.original_sprite = sprite  # Save the original sprite for flipping
-            self.speed = speed
+            self.width = dict['size']
+            self.height = dict['size']
+            self.sprite = dict['sprite']  # The sprite image for the player
+            self.original_sprite = dict['sprite']  # Save the original sprite for flipping
+            self.aggr = dict['aggr']
+            self.speed = 1
             self.flip = 0
-            self.dmg = ad
+            self.ambient_x = 0
+            self.ambient_y = 0
+            if self.aggr == 0:
+                self.dmg = 180
+            else:
+                self.dmg = dict['ad']
+            self.shot = dict['shot']
+            self.spawn = dict['spawned']
+            if self.spawn != False:
+                dict['spawned'] == True
+
 
         def move(self, dx, dy):
             if self.x_vel != 0 and self.y_vel !=0:
@@ -177,36 +189,50 @@ class Enemy(pygame.sprite.Sprite):
             else:
                 self.rect.x += dx
                 self.rect.y += dy
-
+            
         def hunt(self,playerx,playery):
-            self.x_vel = self.y_vel = 0
-            distx = self.rect.x - playerx
-            disty = self.rect.y - playery
-            x = y = 0 
-            if distx > 0:
+            self.x_vel = self.y_vel = 0            
+
+            if self.aggr == 0:
+                self.dmg += 1
+                if self.dmg >= 180:
+                    self.ambient_x = random.randint(30,482)
+                    self.ambient_y = random.randint(30,482)
+                    self.dmg = 0
+
+            distx = self.rect.x -playerx*self.aggr - (1-self.aggr)*self.ambient_x
+            disty = self.rect.y -playery*self.aggr - (1-self.aggr)*self.ambient_y
+
+            if distx >= 0:
                 x = 1
             else:
                 x = -1
 
-            if disty > 0:
+            if disty >= 0:
                 y = 1
             else:
                 y = -1
-
-            self.flip = x
-
-            if np.abs(distx) <= 3 and np.abs(disty) <= 3:
-                health_bar_player.hp -= self.dmg
-
-            if (distx**2 + disty**2)**0.5 < 250:
-                self.x_vel -= x * self.speed
+            if np.abs(distx)>5 and np.abs(disty)>5:
+                self.flip = x
+            if self.aggr ==1:
+                if (distx**2 + disty**2)**0.5 < 250  :
+                    self.x_vel -= x * self.speed 
+                    self.y_vel -= y * self.speed
+            else:
+                self.x_vel -= x * self.speed 
                 self.y_vel -= y * self.speed
-
+            
+            if np.abs(distx) <= 3 and np.abs(disty) <= 3 and self.aggr == 1:
+                health_bar_player.hp -= self.dmg
+            
             self.move(self.x_vel,self.y_vel)
         
 
         def collide(self,proj):
-            return pygame.Rect.colliderect(self.rect,proj)
+            bool = pygame.Rect.colliderect(self.rect,proj)
+            if bool == True:
+                self.shot = bool
+            return bool
 
         def draw(self,win):
             fishL = pygame.transform.flip(self.original_sprite, True, False)
@@ -465,7 +491,7 @@ class Pickup(pygame.sprite.Sprite):
             self.dict['status'] = True
 
 # --- Game Functions ---
-def draw_char(player,proj,enemy,walls, boss, items):
+def draw_char(player,proj,enemy,walls, boss, items,dict):
     global start_time, time_since_pop, boss_beaten
     coll = []
     # window.blit(BG, (0, 0))   
@@ -479,11 +505,20 @@ def draw_char(player,proj,enemy,walls, boss, items):
             punch.draw(window)
 
     for ind,en in enumerate(enemy): #check for enemies, delete if collided
-        for collider in coll:
-            if en.collide(collider) == True:
-                enemy.pop(ind)
-                proj.pop()
-        else: 
+        # for collider in coll:
+        #     if en.collide(collider) == True:
+        #         enemy.pop(ind)
+        #         proj.pop()
+        # else: 
+        #     en.hunt(player.rect.x,player.rect.y)
+        #     en.draw(window)
+        if en.spawn == False:
+            if coll != []:
+                for collider in coll:
+                    if en.collide(collider) == True:
+                        proj.clear()
+                        enemy.pop(ind)
+                        #en['shot'] = True
             en.hunt(player.rect.x,player.rect.y)
             en.draw(window)
 
@@ -538,8 +573,9 @@ def handle_movement(player,proj,cooldown):
             proj.append(projectile(player.rect.x + (-1)**player.flip*24,player.rect.y,16,16,player.hit,player.flip,0.5))
     if keys[pygame.K_ESCAPE]:
         main_men()
-    if keys[pygame.K_p]:
-        print(f'current x-pos: {player.rect.center[0]}  current y-pos: {player.rect.center[1]}')
+    # debug option
+    # if keys[pygame.K_p]:
+    #     print(f'current x-pos: {player.rect.center[0]}  current y-pos: {player.rect.center[1]}')
 
 # --- some global variables ---
 health_bar_player = healthbar(80,25,100,10,100,"player")
@@ -575,6 +611,13 @@ def main():
     coll = []
     boss = []
     items = []
+    pending_spawns = []
+
+    def handle_enemy_spawns():
+        for spawn in pending_spawns:
+            enemy.append(Enemy(spawn))
+        pending_spawns.clear()
+
     light_value = 90
     update_music("Vibes")
     ambience = mixer.Sound("./sounds/ambience.mp3")
@@ -621,6 +664,162 @@ def main():
     lightR = light
     lightL = pygame.transform.flip(light, True, False)
 
+    # --- hardcode enemies ---
+    enemy_dict = [{
+        'room' : (0,4),
+       'pos': (256,256),
+       'size': 50,
+       'sprite' : fish2,
+       'ad' : 10,
+       'aggr' : 1,
+       'shot' : False,
+       'spawned' : False
+    },
+    {
+        'room' : (1,0),
+       'pos': (312,124),
+       'size': 50,
+       'sprite' : fish1,
+       'ad' : 10,
+       'aggr' : 1,
+       'shot' : False,
+        'spawned' : False
+    },
+    {  'room' : (1,1),
+       'pos': (312,124),
+       'size': 50,
+       'sprite' : fish1,
+       'ad' : 10,
+       'aggr' : 1,
+       'shot' : False,
+        'spawned' : False},
+    {  'room' : (2,2),
+       'pos': (32,194),
+       'size': 50,
+       'sprite' : jellyfish1,
+       'ad' : 10,
+       'aggr' : 0,
+       'shot' : False,
+        'spawned' : False
+       },
+    {  'room' : (4,2),
+       'pos': (32,194),
+       'size': 50,
+       'sprite' : fish2,
+       'ad' : 10,
+       'aggr' : 1,
+       'shot' : False,
+        'spawned' : False
+       },
+    {  'room' : (4,2),
+       'pos': (32,194),
+       'size': 50,
+       'sprite' : fish2,
+       'ad' : 10,
+       'aggr' : 1,
+       'shot' : False,
+        'spawned' : False
+       },
+    {  'room' : (3,0),
+       'pos': (290,400),
+       'size': 50,
+       'sprite' : squid,
+       'ad' : 10,
+       'aggr' : 0,
+       'shot' : False,
+        'spawned' : False
+       }, 
+    {  'room' : (3,0),
+       'pos': (290,400),
+       'size': 50,
+       'sprite' : squid,
+       'ad' : 10,
+       'aggr' : 0,
+       'shot' : False,
+        'spawned' : False
+       },  
+    {  'room' : (4,1),
+       'pos': (290,400),
+       'size': 50,
+       'sprite' : squid,
+       'ad' : 10,
+       'aggr' : 0,
+       'shot' : False,
+        'spawned' : False
+       },  
+    {  'room' : (4,1),
+       'pos': (290,400),
+       'size': 50,
+       'sprite' : squid,
+       'ad' : 10,
+       'aggr' : 0,
+       'shot' : False,
+        'spawned' : False
+       },
+    {  'room' : (4,1),
+       'pos': (290,400),
+       'size': 50,
+       'sprite' : squid,
+       'ad' : 10,
+       'aggr' : 0,
+       'shot' : False,
+        'spawned' : False
+       }, 
+    {  'room' : (4,1),
+       'pos': (290,400),
+       'size': 50,
+       'sprite' : squid,
+       'ad' : 10,
+       'aggr' : 0,
+       'shot' : False,
+        'spawned' : False
+       }, 
+    {  'room' : (4,5),
+       'pos': (290,400),
+       'size': 50,
+       'sprite' : squid,
+       'ad' : 10,
+       'aggr' : 0,
+       'shot' : False,
+        'spawned' : False
+       }, 
+    {  'room' : (5,0),
+       'pos': (210,300),
+       'size': 50,
+       'sprite' : anglerfish,
+       'ad' : 10,
+       'aggr' : 1,
+       'shot' : False,
+        'spawned' : False
+       },   
+    {  'room' : (5,2),
+       'pos': (210,300),
+       'size': 50,
+       'sprite' : anglerfish,
+       'ad' : 10,
+       'aggr' : 1,
+       'shot' : False,
+        'spawned' : False
+       }, 
+    {  'room' : (5,5),
+       'pos': (110,290),
+       'size': 50,
+       'sprite' : anglerfish,
+       'ad' : 10,
+       'aggr' : 1,
+       'shot' : False,
+        'spawned' : False
+       }, 
+    {  'room' : (5,5),
+       'pos': (210,40),
+       'size': 50,
+       'sprite' : anglerfish,
+       'ad' : 10,
+       'aggr' : 1,
+       'shot' : False,
+        'spawned' : False}]
+
+    # --- hardcode items ---
     items_dict = [{
         'name' : 'hp_buff',
         'room' : (1,3),
@@ -664,7 +863,8 @@ def main():
     # Dialogue and spawn timers
     BossTime = None
     SpwanTime = None
-    dialogue_duration = 3500  # 3 seconds in milliseconds
+    easteregg_time = None
+    dialogue_duration = 4000  # 3 seconds in milliseconds
     enemyT1 = None
     enemyT2 = None
     enemyT3 = None
@@ -672,7 +872,7 @@ def main():
 
     run = True
     while run:
-        clock.tick(60)
+        clock.tick(30)
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -695,28 +895,43 @@ def main():
             if y_walls[current_row][current_col] == 1:
                 coll.append(Collider(498, 0, 40, 512, coll_y))
 
+        zone = 0
+        if current_row <2:
+            zone=1
+        elif  current_row ==2:
+            zone=2
+        elif current_row >2:
+            zone=3       
+        
+        for entry in enemy_dict:
+            if entry['room'] == (current_row,current_col) and entry['shot'] == False:
+                pending_spawns.append(entry)
+                entry['shot'] = True
+
+        handle_enemy_spawns()
+
         # On-screen Movement
         draw_window(current_window)
 
-        # ----------spawn enemys --------
-        if current_row == 1 and current_col == 2:  
-            if enemyT1 is None:
-                enemyT1 = pygame.time.get_ticks()  # Record the start time when entering the room
-            elapsed_time = pygame.time.get_ticks() - enemyT1
-            if elapsed_time < enemy_spawn_duration:
-                enemy.append(Enemy(300, 300, 50, 50, fish1, 3, 1))
-        if current_row == 0 and current_col == 0:  
-            if enemyT2 is None:
-                enemyT2 = pygame.time.get_ticks()  # Record the start time when entering the room
-            elapsed_time = pygame.time.get_ticks() - enemyT2
-            if elapsed_time < enemy_spawn_duration:
-                enemy.append(Enemy(300, 300, 70, 70, fish2, 4, 2))
-        if current_row == 0 and current_col == 4:  
-            if enemyT3 is None:
-                enemyT3 = pygame.time.get_ticks()  # Record the start time when entering the room
-            elapsed_time = pygame.time.get_ticks() - enemyT3
-            if elapsed_time < enemy_spawn_duration:
-                enemy.append(Enemy(300, 300, 30, 30, fish3, 2, 2))
+        # # ----------spawn enemys --------
+        # if current_row == 1 and current_col == 2:  
+        #     if enemyT1 is None:
+        #         enemyT1 = pygame.time.get_ticks()  # Record the start time when entering the room
+        #     elapsed_time = pygame.time.get_ticks() - enemyT1
+        #     if elapsed_time < enemy_spawn_duration:
+        #         enemy.append(Enemy(300, 300, 50, 50, fish1, 3, 1))
+        # if current_row == 0 and current_col == 0:  
+        #     if enemyT2 is None:
+        #         enemyT2 = pygame.time.get_ticks()  # Record the start time when entering the room
+        #     elapsed_time = pygame.time.get_ticks() - enemyT2
+        #     if elapsed_time < enemy_spawn_duration:
+        #         enemy.append(Enemy(300, 300, 70, 70, fish2, 4, 2))
+        # if current_row == 0 and current_col == 4:  
+        #     if enemyT3 is None:
+        #         enemyT3 = pygame.time.get_ticks()  # Record the start time when entering the room
+        #     elapsed_time = pygame.time.get_ticks() - enemyT3
+        #     if elapsed_time < enemy_spawn_duration:
+        #         enemy.append(Enemy(300, 300, 30, 30, fish3, 2, 2))
 
         for item in items_dict:
             if current_col == item['room'][0] and current_row == item['room'][1] and item['status'] == False:
@@ -735,7 +950,8 @@ def main():
             
             health_bar_boss.draw(window)
 
-        draw_char(current_window.player, proj, enemy, coll,boss, items) 
+        draw_char(current_window.player, proj, enemy, coll,boss, items,enemy_dict) 
+        
         handle_movement(current_window.player, proj,cooldown)
         current_window.player.draw(window)
         current_window.update() 
@@ -789,14 +1005,23 @@ def main():
             elapsed_time = pygame.time.get_ticks() - BossTime
 
             if elapsed_time < dialogue_duration:
-                draw_dialogue_box(window, "Lets throw hands fucker")
+                draw_dialogue_box(window, "Lets throw hands fucker!")
+
         if current_row == 0 and current_col == 2:
             if SpwanTime is None:
                 SpwanTime = pygame.time.get_ticks()  # Record the start time when entering the room
             elapsed_time = pygame.time.get_ticks() - SpwanTime
 
             if elapsed_time < dialogue_duration:
-                draw_dialogue_box(window, "Damn this octopus got my Fent")
+                draw_dialogue_box(window, "Well then, lets start investigating...")
+
+        if current_row == 4 and current_col == 0:
+            if easteregg_time is None:
+                easteregg_time = pygame.time.get_ticks()  # Record the start time when entering the room
+            elapsed_time = pygame.time.get_ticks() - easteregg_time
+
+            if elapsed_time < dialogue_duration:
+                draw_dialogue_box(window, "This looks ... fishy")
 
         pygame.display.flip()
 
@@ -812,7 +1037,7 @@ def start_game():
     start_time = time.time()
     time_since_pop = 0
 
-    health_bar_boss.hp = 400
+    health_bar_boss.hp = 500
     main()
 
 def game_over():
@@ -848,9 +1073,192 @@ def main_men():
         mixer.stop()
 
     mainmenu = pygame_menu.Menu("", WIDTH, HEIGHT, theme = main_theme)
-    mainmenu.add.button("Play", start_game)
+    mainmenu.add.button("Play", intro)
     mainmenu.add.button("Exit", pygame_menu.events.EXIT)
 
     mainmenu.mainloop(window)
+
+def intro():
+    # Custom font for both text and menu
+    Fent_font = "font/PressStart2P-Regular.ttf"
+    font = pygame.font.Font(Fent_font, 15)
+
+    # Background and menu theme
+    win_img = pygame_menu.baseimage.BaseImage(
+        image_path="sprites/Intro.png", drawing_mode=pygame_menu.baseimage.IMAGE_MODE_FILL
+    )
+    win_theme = Theme(
+        background_color=win_img,
+        widget_font=Fent_font,
+        widget_font_size=17,
+        title_bar_style=pygame_menu.widgets.MENUBAR_STYLE_NONE
+    )
+
+    # Typing message
+    message = "For a while now, boats\nkeep disappearing far out.\n\nDue to your history \nwith deepsea shenanigans, you \nwere contracted by the state.\n\nThe village relies on your help."
+    lines = message.split('\n')
+    text_speed = 15  # ms between characters
+
+    display_text = ""
+    char_index = 0
+    line_index = 0
+    last_update = pygame.time.get_ticks()
+    text_done = False
+
+    while True:
+        window.fill((0, 0, 0))
+        window.blit(win_img.get_surface(), (0, 0))
+
+        now = pygame.time.get_ticks()
+        if not text_done and now - last_update > text_speed:
+            if line_index < len(lines):
+                line = lines[line_index]
+                if char_index < len(line):
+                    display_text += line[char_index]
+                    char_index += 1
+                    last_update = now
+                else:
+                    display_text += '\n'
+                    line_index += 1
+                    char_index = 0
+            else:
+                text_done = True
+                text_done_time = pygame.time.get_ticks()
+
+        # Render left-aligned text
+        y = HEIGHT // 6
+        padding = 35
+        for i, line in enumerate(display_text.split('\n')):
+            text_surface = font.render(line, True, (255, 255, 255))
+            text_rect = text_surface.get_rect()
+            text_rect.topleft = (padding, y + i * 40)
+            window.blit(text_surface, text_rect)
+
+        # Show hint after short delay
+        if text_done and now - text_done_time > 1000:
+            hint_font = pygame.font.Font(Fent_font, 16)
+            hint = hint_font.render("Press ENTER to continue", True, (200, 200, 200))
+            hint_rect = hint.get_rect(center=(WIDTH // 2, HEIGHT - 60))
+            window.blit(hint, hint_rect)
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+                if not text_done:
+                    display_text = message
+                    text_done = True
+                    text_done_time = pygame.time.get_ticks()
+                else:
+                    # Final menu after message
+                    win = pygame_menu.Menu("", WIDTH, HEIGHT, theme=win_theme)
+                    win.add.label("Find the cause",font_color=(210, 210, 210))
+                    win.add.label("for the disappearences.",font_color=(210, 210, 210))
+                    win.add.label("")
+                    win.add.label("Be cautios tho, these waters",font_color=(210, 210, 210))
+                    win.add.label(" aren't to well explored...",font_color=(210, 210, 210))
+                    win.add.vertical_margin(20)
+                    win.add.label("Are you ready?",font_color=(210, 210, 210))
+                    win.add.label("")
+                    win.add.label("")
+                    win.add.label("")
+                      # small spacer
+                    win.add.button("Submerge", start_game)
+                    win.mainloop(window)
+                    return
+
+def win():
+    # Custom font for both text and menu
+    Fent_font = "font/PressStart2P-Regular.ttf"
+    font = pygame.font.Font(Fent_font, 15)
+
+    # Background and menu theme
+    win_img = pygame_menu.baseimage.BaseImage(
+        image_path="sprites/GameOver.png", drawing_mode=pygame_menu.baseimage.IMAGE_MODE_FILL
+    )
+    win_theme = Theme(
+        background_color=win_img,
+        widget_font=Fent_font,
+        widget_font_size=20,
+        title_bar_style=pygame_menu.widgets.MENUBAR_STYLE_NONE
+    )
+
+    # Typing message
+    message = "After a long fight, \npeace returns to the land.\nYou did well.\nThe Hamburger Hafen is safe,\nat least for now..."
+    lines = message.split('\n')
+    text_speed = 17  # ms between characters
+
+    display_text = ""
+    char_index = 0
+    line_index = 0
+    last_update = pygame.time.get_ticks()
+    text_done = False
+
+    while True:
+        window.fill((0, 0, 0))
+        window.blit(win_img.get_surface(), (0, 0))
+
+        now = pygame.time.get_ticks()
+        if not text_done and now - last_update > text_speed:
+            if line_index < len(lines):
+                line = lines[line_index]
+                if char_index < len(line):
+                    display_text += line[char_index]
+                    char_index += 1
+                    last_update = now
+                else:
+                    display_text += '\n'
+                    line_index += 1
+                    char_index = 0
+            else:
+                text_done = True
+                text_done_time = pygame.time.get_ticks()
+
+        # Render left-aligned text
+        y = HEIGHT // 4
+        padding = 40
+        for i, line in enumerate(display_text.split('\n')):
+            text_surface = font.render(line, True, (255, 255, 255))
+            text_rect = text_surface.get_rect()
+            text_rect.topleft = (padding, y + i * 40)
+            window.blit(text_surface, text_rect)
+
+        # Show hint after short delay
+        if text_done and now - text_done_time > 1000:
+            hint_font = pygame.font.Font(Fent_font, 16)
+            hint = hint_font.render("Press ENTER to continue", True, (200, 200, 200))
+            hint_rect = hint.get_rect(center=(WIDTH // 2, HEIGHT - 60))
+            window.blit(hint, hint_rect)
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+                if not text_done:
+                    display_text = message
+                    text_done = True
+                    text_done_time = pygame.time.get_ticks()
+                else:
+                    # Final menu after message
+                    win = pygame_menu.Menu("", WIDTH, HEIGHT, theme=win_theme)
+                    win.add.label("The creature was bested",font_color=(210, 210, 210))
+                    win.add.label("")
+                    win.add.label("The seven seas still",font_color=(210, 210, 210))
+                    win.add.label("need your help",font_color=(210, 210, 210))
+                    win.add.vertical_margin(20)
+                    win.add.label("Are you ready?",font_color=(210, 210, 210))
+                    win.add.label("")
+                    win.add.label("")
+                    win.add.label("")
+                      # small spacer
+                    win.add.button("Continue", main_men)
+                    win.mainloop(window)
+                    return
 
 main_men()
