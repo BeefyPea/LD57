@@ -35,7 +35,7 @@ WINDOW_WIDTH, WINDOW_HEIGHT = WIDTH, HEIGHT
 # --- Pygame Setup ---
 pygame.init()
 window = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Das Koks U-Boot")
+pygame.display.set_caption("THE ABYSS CALLS")
 
 # Load background and scale
 BG = pygame.image.load("sprites/BG_big.png")
@@ -81,7 +81,7 @@ class healthbar():
                 pygame.draw.rect(surface, "darkkhaki", (self.x, self.y, self.w, self.h))
                 pygame.draw.rect(surface, "yellow", (self.x, self.y, self.w * ratio, self.h))
             if self.w * self.hp / self.max_hp <= 0:
-                main_men()
+                win()
         if self.parent == "depth":
             pygame.draw.rect(surface, "Gray", (self.x, self.y, self.w, self.h))
             pygame.draw.rect(surface, "Blue", (self.x, self.y, self.w * ratio, self.h))
@@ -785,7 +785,7 @@ def main():
        'shot' : False,
         'spawned' : False
        }, 
-    {  'room' : (4,5),
+    {  'room' : (4,4),
        'pos': (290,400),
        'size': 50,
        'sprite' : squid,
@@ -794,7 +794,7 @@ def main():
        'shot' : False,
         'spawned' : False
        }, 
-    {  'room' : (5,0),
+    {  'room' : (4,0),
        'pos': (210,300),
        'size': 50,
        'sprite' : anglerfish,
@@ -803,7 +803,7 @@ def main():
        'shot' : False,
         'spawned' : False
        },   
-    {  'room' : (5,2),
+    {  'room' : (4,2),
        'pos': (210,300),
        'size': 50,
        'sprite' : anglerfish,
@@ -812,7 +812,7 @@ def main():
        'shot' : False,
         'spawned' : False
        }, 
-    {  'room' : (5,5),
+    {  'room' : (4,4),
        'pos': (110,290),
        'size': 50,
        'sprite' : anglerfish,
@@ -821,7 +821,7 @@ def main():
        'shot' : False,
         'spawned' : False
        }, 
-    {  'room' : (5,5),
+    {  'room' : (4,4),
        'pos': (210,40),
        'size': 50,
        'sprite' : anglerfish,
