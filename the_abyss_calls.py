@@ -13,6 +13,17 @@ import pygame_menu.widgets
 from pygame.locals import *
 from pygame import mixer
 import numpy as np
+import sys
+import os
+
+def resource_path(relative_path):
+    try:
+    # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 # --- Constants ---
 WIDTH, HEIGHT = 512, 512
@@ -1177,7 +1188,7 @@ def win():
 
     # Background and menu theme
     win_img = pygame_menu.baseimage.BaseImage(
-        image_path="sprites/GameOver.png", drawing_mode=pygame_menu.baseimage.IMAGE_MODE_FILL
+        image_path="sprites/outro.png", drawing_mode=pygame_menu.baseimage.IMAGE_MODE_FILL
     )
     win_theme = Theme(
         background_color=win_img,
@@ -1185,6 +1196,9 @@ def win():
         widget_font_size=20,
         title_bar_style=pygame_menu.widgets.MENUBAR_STYLE_NONE
     )
+
+    # Music
+    update_music("new_intro")
 
     # Typing message
     message = "After a long fight, \npeace returns to the land.\nYou did well.\nThe Hamburger Hafen is safe,\nat least for now..."
@@ -1260,5 +1274,5 @@ def win():
                     win.add.button("Continue", main_men)
                     win.mainloop(window)
                     return
-
+                
 main_men()
